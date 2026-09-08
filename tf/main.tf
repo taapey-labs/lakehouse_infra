@@ -27,4 +27,6 @@ module "databricks_sra" {
 
   databricks_client_id     = var.databricks_client_id
   databricks_client_secret = var.databricks_client_secret
+
+  cross_workspace_ingress_allowed_workspace_ids = var.cross_workspace_ingress_allowed_workspace_ids
 }

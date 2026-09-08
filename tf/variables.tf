@@ -95,3 +95,13 @@ variable "custom_scc_relay_mws_vpce_id" {
   default     = null
   description = "Pre-registered Databricks MWS VPC endpoint ID for the SCC relay (accounts.../vpc-endpoints)"
 }
+
+# SRA defaults this to [] (RESTRICTED_ACCESS, no sources). Unity Catalog backend
+# calls into the workspace are then denied with:
+#   403 Unauthorized network access to workspace: <id>  (SQLSTATE KCUC4)
+# Allow-listing this workspace as a source unblocks same-workspace UC/serverless.
+variable "cross_workspace_ingress_allowed_workspace_ids" {
+  type        = list(number)
+  description = "Source workspace IDs allowed to reach this workspace over SRA cross-workspace ingress"
+  default     = [7474654246419237]
+}
