@@ -36,11 +36,20 @@ Classic compute over PrivateLink opens an SCC (ngrok) tunnel to the relay VPC en
 - Workspace SG egress TCP 2443 and 6666
 - PrivateLink endpoint SG ingress TCP 2443 and 6666 from the workspace SG
 
-Update the `vpc_customer.manage` CloudFormation stack, then restart the classic cluster. From an EC2 instance in a workspace subnet, confirm:
+The workspace/REST VPC endpoint private DNS name is `ncalifornia.privatelink.cloud.databricks.com`. That is **not** the SCC relay. Classic compute looks up `tunnel.privatelink.cloud.databricks.com`. If that name resolves to the REST ENIs, `nc` to 2443/6666 returns **connection refused**.
+
+The template now:
+
+- Leaves REST private DNS on (`ncalifornia.privatelink.cloud.databricks.com`)
+- Turns **off** AWS-managed private DNS on the SCC endpoint
+- Creates a Route 53 private zone that aliases `tunnel.privatelink.cloud.databricks.com` to the SCC VPC endpoint
+
+Update the `vpc_customer.manage` CloudFormation stack, then restart the classic cluster. From a workspace subnet, confirm the two names resolve to **different** IPs:
 
 ```bash
-nslookup tunnel.privatelink.cloud.databricks.com   # private VPCE IPs, not public
-nc -zv tunnel.privatelink.cloud.databricks.com 2443
+nslookup ncalifornia.privatelink.cloud.databricks.com   # REST VPCE ENIs
+nslookup tunnel.privatelink.cloud.databricks.com         # SCC VPCE ENIs (not the REST pair)
+nc -zv tunnel.privatelink.cloud.databricks.com 2443      # succeeded, not connection refused
 nc -zv tunnel.privatelink.cloud.databricks.com 6666
 ```
 

@@ -332,7 +332,9 @@ Resources:
       RouteTableIds:
         - !Ref PrivateRouteTable
 
-  # --- Private (PrivateLink) endpoints for Databricks front-end/back-end connectivity ---
+  # REST / General Access. Private DNS name is ncalifornia.privatelink.cloud.databricks.com
+  # (us-west-1). That zone can also answer tunnel.privatelink.cloud.databricks.com via a
+  # parent wildcard, which sends SCC traffic to the REST NLB (connection refused on 2443/6666).
   DatabricksWorkspaceVpcEndpoint:
     Type: AWS::EC2::VPCEndpoint
     Properties:
@@ -346,18 +348,45 @@ Resources:
       SecurityGroupIds:
         - !Ref DatabricksEndpointSecurityGroup
 
+  # SCC relay. Do not enable AWS-managed private DNS here: it fights the REST endpoint's
+  # privatelink.cloud.databricks.com zone. Pin tunnel.* with an explicit hosted zone below.
   DatabricksSccRelayVpcEndpoint:
     Type: AWS::EC2::VPCEndpoint
     Properties:
       VpcId: !Ref Vpc
       ServiceName: !Ref DatabricksSccRelayVpceServiceName
       VpcEndpointType: Interface
-      PrivateDnsEnabled: true
+      PrivateDnsEnabled: false
       SubnetIds:
         - !Ref WorkspaceSubnetA
         - !Ref WorkspaceSubnetB
       SecurityGroupIds:
         - !Ref DatabricksEndpointSecurityGroup
+
+  SccRelayPrivateHostedZone:
+    Type: AWS::Route53::HostedZone
+    DependsOn: DatabricksSccRelayVpcEndpoint
+    Properties:
+      Name: tunnel.privatelink.cloud.databricks.com
+      VPCs:
+        - VPCId: !Ref Vpc
+          VPCRegion: !Ref AWS::Region
+      HostedZoneConfig:
+        Comment: Pin Databricks SCC relay PrivateLink to the relay VPC endpoint
+
+  SccRelayTunnelRecord:
+    Type: AWS::Route53::RecordSet
+    DependsOn:
+      - DatabricksSccRelayVpcEndpoint
+      - SccRelayPrivateHostedZone
+    Properties:
+      HostedZoneId: !Ref SccRelayPrivateHostedZone
+      Name: tunnel.privatelink.cloud.databricks.com
+      Type: A
+      AliasTarget:
+        HostedZoneId: !Select [0, !Split [':', !Select [0, !GetAtt DatabricksSccRelayVpcEndpoint.DnsEntries]]]
+        DNSName: !Select [1, !Split [':', !Select [0, !GetAtt DatabricksSccRelayVpcEndpoint.DnsEntries]]]
+        EvaluateTargetHealth: false
 
 Outputs:
   VpcId:
