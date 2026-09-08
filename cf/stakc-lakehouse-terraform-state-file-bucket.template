@@ -7,11 +7,21 @@ Parameters:
     Default: lakehouse
     Description: Name prefix used for resources
 
+  BucketName:
+    Type: String
+    Default: stack-lakehouse-terraform-state-file-bucket
+    Description: Must match the bucket name referenced in tf/backend.tf
+
+  TableName:
+    Type: String
+    Default: stack-lakehouse-terraform-state-lock
+    Description: Must match the dynamodb_table referenced in tf/backend.tf
+
 Resources:
   TerraformStateBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub '${ProjectName}-tf-state-${AWS::AccountId}'
+      BucketName: !Ref BucketName
       VersioningConfiguration:
         Status: Enabled
       BucketEncryption:
@@ -27,7 +37,7 @@ Resources:
   TerraformLockTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Sub '${ProjectName}-tf-locks'
+      TableName: !Ref TableName
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: LockID

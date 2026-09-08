@@ -22,3 +22,4 @@ terraform apply \
 ```
 
 This configuration creates a Databricks workspace in AWS using `compute_mode = "SERVERLESS"`.
+

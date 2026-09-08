@@ -1,0 +1,351 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  Customer-managed VPC for a Databricks classic workspace.
+  Creates a /25 VPC with two private /26 workspace subnets (one per AZ),
+  a small public subnet for the NAT gateway, the required Databricks security
+  group, and AWS PrivateLink interface endpoints (front-end + back-end) for
+  private connectivity to Databricks.
+  Ref: https://docs.databricks.com/aws/en/security/network/classic/customer-managed-vpc
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: lakehouse
+    Description: Name prefix used for resources
+
+  VpcCidr:
+    Type: String
+    Default: 10.10.0.0/25
+    Description: Primary VPC CIDR (/25), fully consumed by the two /26 workspace subnets
+
+  NatSubnetCidr:
+    Type: String
+    Default: 10.10.1.0/28
+    Description: Small secondary CIDR used only for the public NAT subnet (added as a secondary VPC CIDR block)
+
+  WorkspaceSubnetACidr:
+    Type: String
+    Default: 10.10.0.0/26
+    Description: Databricks private workspace subnet A (/26)
+
+  WorkspaceSubnetBCidr:
+    Type: String
+    Default: 10.10.0.64/26
+    Description: Databricks private workspace subnet B (/26)
+
+  AvailabilityZoneA:
+    Type: AWS::EC2::AvailabilityZone::Name
+    Description: AZ for workspace subnet A / NAT gateway
+
+  AvailabilityZoneB:
+    Type: AWS::EC2::AvailabilityZone::Name
+    Description: AZ for workspace subnet B
+
+  DatabricksWorkspaceVpceServiceName:
+    Type: String
+    Description: >-
+      AWS PrivateLink service name for the Databricks workspace (REST API) endpoint.
+      Region-specific; look up the exact value for your workspace region in the
+      "PrivateLink VPC endpoint services" table:
+      https://docs.databricks.com/aws/en/resources/ip-domain-region#privatelink
+      Format: com.amazonaws.vpce.<region>.vpce-svc-xxxxxxxxxxxxxxxxx
+
+  DatabricksSccRelayVpceServiceName:
+    Type: String
+    Description: >-
+      AWS PrivateLink service name for the Databricks secure cluster connectivity (SCC) relay.
+      Region-specific; look up the exact value for your workspace region in the
+      "PrivateLink VPC endpoint services" table:
+      https://docs.databricks.com/aws/en/resources/ip-domain-region#privatelink
+      Format: com.amazonaws.vpce.<region>.vpce-svc-xxxxxxxxxxxxxxxxx
+
+Resources:
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCidr
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-databricks-vpc'
+
+  NatCidrBlock:
+    Type: AWS::EC2::VPCCidrBlock
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Ref NatSubnetCidr
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-databricks-igw'
+
+  VpcGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref Vpc
+      InternetGatewayId: !Ref InternetGateway
+
+  # --- Databricks private workspace subnets (2x /26, one per AZ) ---
+  WorkspaceSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Ref WorkspaceSubnetACidr
+      AvailabilityZone: !Ref AvailabilityZoneA
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-databricks-private-a'
+
+  WorkspaceSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Ref WorkspaceSubnetBCidr
+      AvailabilityZone: !Ref AvailabilityZoneB
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-databricks-private-b'
+
+  # --- Public subnet dedicated to the NAT gateway ---
+  NatSubnet:
+    Type: AWS::EC2::Subnet
+    DependsOn: NatCidrBlock
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Ref NatSubnetCidr
+      AvailabilityZone: !Ref AvailabilityZoneA
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-databricks-nat'
+
+  NatEip:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+
+  NatGateway:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatEip.AllocationId
+      SubnetId: !Ref NatSubnet
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-databricks-natgw'
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-databricks-public-rt'
+
+  PublicDefaultRoute:
+    Type: AWS::EC2::Route
+    DependsOn: VpcGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  NatSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref NatSubnet
+      RouteTableId: !Ref PublicRouteTable
+
+  # --- Private route table for the two workspace subnets (quad-zero -> NAT) ---
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-databricks-private-rt'
+
+  PrivateDefaultRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway
+
+  WorkspaceSubnetARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref WorkspaceSubnetA
+      RouteTableId: !Ref PrivateRouteTable
+
+  WorkspaceSubnetBRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref WorkspaceSubnetB
+      RouteTableId: !Ref PrivateRouteTable
+
+  # --- Security group for the Databricks workspace (rules per docs) ---
+  DatabricksWorkspaceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Databricks workspace security group
+      VpcId: !Ref Vpc
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-databricks-sg'
+
+  SgIngressSelfTcp:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref DatabricksWorkspaceSecurityGroup
+      IpProtocol: tcp
+      FromPort: 0
+      ToPort: 65535
+      SourceSecurityGroupId: !Ref DatabricksWorkspaceSecurityGroup
+
+  SgIngressSelfUdp:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref DatabricksWorkspaceSecurityGroup
+      IpProtocol: udp
+      FromPort: 0
+      ToPort: 65535
+      SourceSecurityGroupId: !Ref DatabricksWorkspaceSecurityGroup
+
+  SgEgressSelfTcp:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupId: !Ref DatabricksWorkspaceSecurityGroup
+      IpProtocol: tcp
+      FromPort: 0
+      ToPort: 65535
+      DestinationSecurityGroupId: !Ref DatabricksWorkspaceSecurityGroup
+
+  SgEgressSelfUdp:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupId: !Ref DatabricksWorkspaceSecurityGroup
+      IpProtocol: udp
+      FromPort: 0
+      ToPort: 65535
+      DestinationSecurityGroupId: !Ref DatabricksWorkspaceSecurityGroup
+
+  SgEgressHttps:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupId: !Ref DatabricksWorkspaceSecurityGroup
+      IpProtocol: tcp
+      FromPort: 443
+      ToPort: 443
+      CidrIp: 0.0.0.0/0
+
+  SgEgressHiveMetastore:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupId: !Ref DatabricksWorkspaceSecurityGroup
+      IpProtocol: tcp
+      FromPort: 3306
+      ToPort: 3306
+      CidrIp: 0.0.0.0/0
+
+  SgEgressDns:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupId: !Ref DatabricksWorkspaceSecurityGroup
+      IpProtocol: tcp
+      FromPort: 53
+      ToPort: 53
+      CidrIp: 0.0.0.0/0
+
+  SgEgressSccRelay:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupId: !Ref DatabricksWorkspaceSecurityGroup
+      IpProtocol: tcp
+      FromPort: 6666
+      ToPort: 6666
+      CidrIp: 0.0.0.0/0
+
+  SgEgressControlPlaneApi:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupId: !Ref DatabricksWorkspaceSecurityGroup
+      IpProtocol: tcp
+      FromPort: 8443
+      ToPort: 8451
+      CidrIp: 0.0.0.0/0
+
+  # --- Dedicated security group for the VPC (PrivateLink) interface endpoints ---
+  DatabricksEndpointSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for Databricks PrivateLink VPC interface endpoints
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          SourceSecurityGroupId: !Ref DatabricksWorkspaceSecurityGroup
+        - IpProtocol: tcp
+          FromPort: 6666
+          ToPort: 6666
+          SourceSecurityGroupId: !Ref DatabricksWorkspaceSecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-databricks-vpce-sg'
+
+  # --- S3 gateway endpoint (recommended regional endpoint, no extra cost) ---
+  S3GatewayEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref Vpc
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.s3'
+      VpcEndpointType: Gateway
+      RouteTableIds:
+        - !Ref PrivateRouteTable
+
+  # --- Private (PrivateLink) endpoints for Databricks front-end/back-end connectivity ---
+  DatabricksWorkspaceVpcEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref Vpc
+      ServiceName: !Ref DatabricksWorkspaceVpceServiceName
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds:
+        - !Ref WorkspaceSubnetA
+        - !Ref WorkspaceSubnetB
+      SecurityGroupIds:
+        - !Ref DatabricksEndpointSecurityGroup
+
+  DatabricksSccRelayVpcEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref Vpc
+      ServiceName: !Ref DatabricksSccRelayVpceServiceName
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds:
+        - !Ref WorkspaceSubnetA
+        - !Ref WorkspaceSubnetB
+      SecurityGroupIds:
+        - !Ref DatabricksEndpointSecurityGroup
+
+Outputs:
+  VpcId:
+    Value: !Ref Vpc
+  WorkspaceSubnetAId:
+    Value: !Ref WorkspaceSubnetA
+  WorkspaceSubnetBId:
+    Value: !Ref WorkspaceSubnetB
+  DatabricksSecurityGroupId:
+    Value: !Ref DatabricksWorkspaceSecurityGroup
+  DatabricksWorkspaceVpcEndpointId:
+    Value: !Ref DatabricksWorkspaceVpcEndpoint
+  DatabricksSccRelayVpcEndpointId:
+    Value: !Ref DatabricksSccRelayVpcEndpoint

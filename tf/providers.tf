@@ -3,23 +3,18 @@ terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = "~> 5.0"
+      version = ">= 5.76, < 7.0" # must satisfy the databricks_sra module's constraint too
     }
     databricks = {
       source  = "databricks/databricks"
-      version = "~> 1.0"
+      version = "~> 1.121" # must satisfy the databricks_sra module's constraint too
     }
-  }
-
-  backend "s3" {
-    bucket         = "databricks-infra-tf-state-<YOUR_ACCOUNT_ID>"
-    key            = "databricks/terraform.tfstate"
-    region         = "us-east-1" # Change to your selected deployment region
-    dynamodb_table = "databricks-infra-tf-locks"
-    encrypt        = true
   }
 }
 
 provider "aws" {
   region = var.aws_region
 }
+
+# The databricks_sra module (in main.tf) configures its own aws/databricks providers
+# internally and authenticates via DATABRICKS_CLIENT_ID/DATABRICKS_CLIENT_SECRET env vars.
