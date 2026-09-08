@@ -21,5 +21,11 @@ terraform apply \
   -var="aws_region=us-east-1"
 ```
 
-This configuration creates a Databricks workspace in AWS using `compute_mode = "SERVERLESS"`.
+This configuration deploys a Databricks workspace in AWS with `compute_mode = "HYBRID"` and `network_configuration = "custom"`.
+
+## Unity Catalog 403 (`Unauthorized network access to workspace`)
+
+SRA attaches a restrictive network policy with cross-workspace ingress set to `RESTRICTED_ACCESS` and an empty allow list. Unity Catalog backend calls into the workspace then fail with HTTP 403 / `KCUC4`.
+
+Workspace `7474654246419237` is allow-listed as a cross-workspace ingress source via `cross_workspace_ingress_allowed_workspace_ids`. Re-apply Terraform so the `{resource_prefix}-np` policy picks up the rule. To allow additional source workspaces, pass more IDs in that variable.
 
