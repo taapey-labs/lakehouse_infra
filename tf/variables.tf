@@ -59,8 +59,8 @@ variable "custom_vpc_id" {
 }
 variable "sg_egress_ports" {
   type        = list(number)
-  description = "Egress ports for the security group"
-  default     = [53, 443, 80, 22, 3306, 1433, 1521,]
+  description = "Egress ports for the security group (must include SCC relay 6666 and FIPS/ngrok 2443)"
+  default     = [53, 80, 22, 443, 2443, 3306, 1433, 1521, 6666, 8443, 8444, 8445, 8446, 8447, 8448, 8449, 8450, 8451]
 }
 
 variable "custom_private_subnet_ids" {

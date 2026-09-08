@@ -271,6 +271,25 @@ Resources:
       ToPort: 6666
       CidrIp: 0.0.0.0/0
 
+  # FIPS / ngrok SCC relay over PrivateLink uses tunnel.privatelink.cloud.databricks.com:2443
+  SgEgressSccRelayFips:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupId: !Ref DatabricksWorkspaceSecurityGroup
+      IpProtocol: tcp
+      FromPort: 2443
+      ToPort: 2443
+      CidrIp: 0.0.0.0/0
+
+  SgEgressDnsUdp:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupId: !Ref DatabricksWorkspaceSecurityGroup
+      IpProtocol: udp
+      FromPort: 53
+      ToPort: 53
+      CidrIp: 0.0.0.0/0
+
   SgEgressControlPlaneApi:
     Type: AWS::EC2::SecurityGroupEgress
     Properties:
@@ -290,6 +309,10 @@ Resources:
         - IpProtocol: tcp
           FromPort: 443
           ToPort: 443
+          SourceSecurityGroupId: !Ref DatabricksWorkspaceSecurityGroup
+        - IpProtocol: tcp
+          FromPort: 2443
+          ToPort: 2443
           SourceSecurityGroupId: !Ref DatabricksWorkspaceSecurityGroup
         - IpProtocol: tcp
           FromPort: 6666
