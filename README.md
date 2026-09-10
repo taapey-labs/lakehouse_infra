@@ -55,14 +55,16 @@ Map stack outputs to SRA:
 | `VpcId` | `custom_vpc_id` |
 | `WorkspaceSubnetAId`, `WorkspaceSubnetBId` | `custom_private_subnet_ids` |
 | `DatabricksSecurityGroupId` | `custom_sg_id` |
-| `DatabricksWorkspaceVpcEndpointId` | `custom_general_access_vpce_id` |
-| `DatabricksSccRelayVpcEndpointId` | `custom_scc_relay_vpce_id` |
+| `DatabricksWorkspaceVpcEndpointId` | `custom_general_access_vpce_id` (AWS `vpce-…`, REST) |
+| `DatabricksSccRelayVpcEndpointId` | `custom_scc_relay_vpce_id` (AWS `vpce-…`, SCC) |
 
 Do **not** put PrivateLink subnet IDs in `custom_private_subnet_ids`. Those are for interface endpoints only.
 
-If VPCEs are already registered in the Databricks account, set `custom_general_access_mws_vpce_id` / `custom_scc_relay_mws_vpce_id` instead of re-registering.
+Pass only CloudFormation AWS `vpce-` IDs. Do **not** pass Databricks account-console VPC endpoint UUIDs (MWS). SRA registers those AWS endpoints itself.
 
-After a stack update that replaces VPCEs, pass the new endpoint IDs into Terraform.
+If apply fails with `DATAPLANE_RELAY_ACCESS cannot be attached in rest_api list` (and `WORKSPACE_ACCESS cannot be attached in dataplane_relay list`), the two AWS VPCE IDs are reversed. Swap `custom_general_access_vpce_id` (REST / `DatabricksWorkspaceVpcEndpointId`) and `custom_scc_relay_vpce_id` (SCC / `DatabricksSccRelayVpcEndpointId`). Remove any leftover `custom_*_mws_vpce_id` from tfvars. If a previous apply already created MWS VPC endpoints with the wrong mapping, delete those account VPC endpoints before re-applying.
+
+After a stack update that replaces VPCEs, pass the new AWS endpoint IDs into Terraform.
 
 ## 2. Terraform SRA workspace
 
