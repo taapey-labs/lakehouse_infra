@@ -12,8 +12,9 @@ module "databricks_sra" {
   admin_user            = var.admin_user
   databricks_account_id = var.databricks_account_id
   aws_account_id        = var.aws_account_id
-  metastore_exists      = var.metastore_exists
-  compliance_standards  = []
+  metastore_exists           = var.metastore_exists
+  audit_log_delivery_exists  = var.audit_log_delivery_exists
+  compliance_standards       = []
   # default_catalog   = var.custom_default_catalog
 
   custom_vpc_id                 = var.custom_vpc_id

@@ -25,6 +25,8 @@ This configuration deploys a Databricks workspace in AWS with `compute_mode = "H
 
 This Databricks account does not support `ingress.cross_workspace_access` on account network policies, so this repo does not create `{prefix}-uc-ingress-np`.
 
+`audit_log_delivery_exists` defaults to `true` so SRA does not recreate `{prefix}-audit-log-delivery-credential` when that MWS credential already exists on the account. Set it to `false` only for a brand-new account that has never had audit log delivery configured.
+
 ## Classic cluster NPIP / ngrok timeout (`tunnel.privatelink.cloud.databricks.com:2443`)
 
 Classic compute over PrivateLink opens an SCC (ngrok) tunnel to the relay VPC endpoint. That path uses TCP **2443** (FIPS) as well as **6666**. The customer VPC template must allow:

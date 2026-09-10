@@ -48,6 +48,12 @@ variable "metastore_exists" {
   description = "Whether a Unity Catalog metastore already exists for this region"
 }
 
+variable "audit_log_delivery_exists" {
+  type        = bool
+  default     = true
+  description = "Set true when the Databricks account already has an audit log delivery configuration (MWS credential name {prefix}-audit-log-delivery-credential). SRA skips creating it when true."
+}
+
 variable "custom_default_catalog" {
   type        = string
   description = "Custom default Unity Catalog for the workspace"
