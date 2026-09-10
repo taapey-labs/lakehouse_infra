@@ -114,7 +114,7 @@ variable "cross_workspace_ingress_allowed_workspace_ids" {
 
 variable "workspace_id" {
   type        = number
-  description = "Numeric Databricks workspace ID (7474654246419237). Used to name the additional catalog bucket and default credential/role."
+  description = "Numeric Databricks workspace ID (7474654246419237). Used to name the additional catalog bucket."
   default     = 7474654246419237
 }
 
@@ -133,21 +133,9 @@ variable "serverless_private_endpoint_rules" {
   default     = []
 }
 
-variable "existing_storage_credential_name" {
-  type        = string
-  description = "Existing Unity Catalog storage credential used for the additional catalog bucket. Defaults to the SRA workspace catalog credential ({resource_prefix}-catalog-{workspace_id}-storage-credential)"
-  default     = null
-}
-
-variable "existing_storage_credential_role_name" {
-  type        = string
-  description = "IAM role name used by that storage credential. Defaults to the SRA catalog role ({resource_prefix}-catalog-{workspace_id})"
-  default     = null
-}
-
 variable "additional_catalog_name" {
   type        = string
-  description = "Unity Catalog name for the additional catalog backed by the new S3 bucket"
+  description = "Unity Catalog name for the additional catalog (metastore default storage; dedicated S3 bucket is created separately)"
   default     = "lakehouse_data"
 }
 

@@ -1,27 +1,13 @@
-# Additional Unity Catalog catalog on a new S3 bucket, using an existing
-# storage credential (no instance profile). Does not replace the SRA workspace catalog.
-#
-# Do not look up the credential via data.databricks_storage_credential: that data source
-# often returns an empty storage_credential_info list (Invalid index). Pass the credential
-# name through to the external location, and grant S3 on the existing credential IAM role.
+# Additional Unity Catalog catalog plus a dedicated S3 bucket.
+# Does not create a storage credential or external location; the catalog uses
+# metastore default storage. The bucket is available to attach later.
+# Does not replace the SRA workspace catalog.
 
 locals {
   additional_catalog_bucket_name = coalesce(
     var.additional_catalog_bucket_name,
     "${var.resource_prefix}-data-${var.workspace_id}"
   )
-  existing_storage_credential_name = coalesce(
-    var.existing_storage_credential_name,
-    "${var.resource_prefix}-catalog-${var.workspace_id}-storage-credential"
-  )
-  existing_credential_role_name = coalesce(
-    var.existing_storage_credential_role_name,
-    "${var.resource_prefix}-catalog-${var.workspace_id}"
-  )
-}
-
-data "aws_iam_role" "existing_credential" {
-  name = local.existing_credential_role_name
 }
 
 resource "aws_s3_bucket" "additional_catalog" {
@@ -62,27 +48,6 @@ resource "aws_s3_bucket_policy" "additional_catalog" {
     Version = "2012-10-17"
     Statement = [
       {
-        Sid    = "ExistingStorageCredentialRoleAccess"
-        Effect = "Allow"
-        Principal = {
-          AWS = data.aws_iam_role.existing_credential.arn
-        }
-        Action = [
-          "s3:GetObject",
-          "s3:GetObjectVersion",
-          "s3:PutObject",
-          "s3:DeleteObject",
-          "s3:ListBucket",
-          "s3:GetBucketLocation",
-          "s3:GetLifecycleConfiguration",
-          "s3:PutLifecycleConfiguration",
-        ]
-        Resource = [
-          aws_s3_bucket.additional_catalog.arn,
-          "${aws_s3_bucket.additional_catalog.arn}/*",
-        ]
-      },
-      {
         Sid    = "DatabricksUnityCatalogAccess"
         Effect = "Allow"
         Principal = {
@@ -110,61 +75,14 @@ resource "aws_s3_bucket_policy" "additional_catalog" {
   })
 }
 
-resource "aws_iam_role_policy" "additional_catalog_s3" {
-  name = "${var.resource_prefix}-data-catalog-s3"
-  role = local.existing_credential_role_name
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid    = "CatalogBucket"
-        Effect = "Allow"
-        Action = [
-          "s3:GetObject",
-          "s3:GetObjectVersion",
-          "s3:PutObject",
-          "s3:DeleteObject",
-          "s3:ListBucket",
-          "s3:GetBucketLocation",
-          "s3:GetLifecycleConfiguration",
-          "s3:PutLifecycleConfiguration",
-        ]
-        Resource = [
-          aws_s3_bucket.additional_catalog.arn,
-          "${aws_s3_bucket.additional_catalog.arn}/*",
-        ]
-      },
-    ]
-  })
-}
-
-resource "databricks_external_location" "additional_catalog" {
-  provider        = databricks.workspace
-  name            = "${var.additional_catalog_name}-external-location"
-  url             = "s3://${aws_s3_bucket.additional_catalog.id}/"
-  credential_name = local.existing_storage_credential_name
-  isolation_mode  = "ISOLATION_MODE_ISOLATED"
-  comment         = "External location for catalog ${var.additional_catalog_name}"
-  skip_validation = true
-
-  depends_on = [
-    aws_iam_role_policy.additional_catalog_s3,
-    aws_s3_bucket_policy.additional_catalog,
-  ]
-}
-
 resource "databricks_catalog" "additional" {
   provider       = databricks.workspace
   name           = var.additional_catalog_name
-  comment        = "Catalog backed by s3://${aws_s3_bucket.additional_catalog.id}/ via storage credential ${local.existing_storage_credential_name}"
-  isolation_mode = "ISOLATED"
-  storage_root   = "s3://${aws_s3_bucket.additional_catalog.id}/"
+  comment        = "Catalog ${var.additional_catalog_name}; dedicated bucket s3://${aws_s3_bucket.additional_catalog.id}/ is provisioned without a storage credential or external location"
+  isolation_mode = "OPEN"
   properties = {
     purpose = "additional-catalog"
   }
-
-  depends_on = [databricks_external_location.additional_catalog]
 }
 
 resource "databricks_grant" "additional_catalog_admin" {

@@ -51,15 +51,11 @@ nc -zv tunnel.privatelink.cloud.databricks.com 2443      # succeeded, not connec
 nc -zv tunnel.privatelink.cloud.databricks.com 6666
 ```
 
-## Additional catalog S3 bucket (existing storage credential)
+## Additional catalog S3 bucket
 
-Terraform creates a new bucket (`{resource_prefix}-data-{workspace_id}` by default) and grants the **existing Unity Catalog storage credential’s IAM role** access on that bucket. No instance profile is created or required.
-
-By default the credential is the SRA workspace catalog one: `{resource_prefix}-catalog-{workspace_id}-storage-credential`, and the IAM role is `{resource_prefix}-catalog-{workspace_id}`. Override with `existing_storage_credential_name` and `existing_storage_credential_role_name` if yours differ.
+Terraform creates a new bucket (`{resource_prefix}-data-{workspace_id}` by default) and catalog `lakehouse_data` (override with `additional_catalog_name`). It does **not** create a Unity Catalog storage credential or external location; the catalog uses metastore default storage. The bucket policy allows Databricks account `414351767826` tagged with this Databricks account ID.
 
 Also created:
 
-- isolated external location `s3://<bucket>/`
-- catalog `lakehouse_data` (override with `additional_catalog_name`)
-- `ALL_PRIVILEGES` for `admin_user`
+- `ALL_PRIVILEGES` on the catalog for `admin_user`
 
