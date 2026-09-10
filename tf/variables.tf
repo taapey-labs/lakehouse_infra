@@ -82,25 +82,12 @@ variable "custom_sg_id" {
 
 variable "custom_general_access_vpce_id" {
   type        = string
-  description = "Workspace PrivateLink VPC endpoint ID from the vpc_customer.manage.template stack output DatabricksWorkspaceVpcEndpointId"
+  description = "AWS vpce- id from CloudFormation DatabricksWorkspaceVpcEndpointId (REST). Do not pass a Databricks account (MWS) VPC endpoint UUID."
 }
 
 variable "custom_scc_relay_vpce_id" {
   type        = string
-  description = "SCC relay PrivateLink VPC endpoint ID from the vpc_customer.manage.template stack output DatabricksSccRelayVpcEndpointId"
-}
-
-# Set when the AWS VPC endpoints above are already registered with the Databricks account (skips re-registration)
-variable "custom_general_access_mws_vpce_id" {
-  type        = string
-  default     = null
-  description = "Pre-registered Databricks MWS VPC endpoint ID for General Access (accounts.../vpc-endpoints)"
-}
-
-variable "custom_scc_relay_mws_vpce_id" {
-  type        = string
-  default     = null
-  description = "Pre-registered Databricks MWS VPC endpoint ID for the SCC relay (accounts.../vpc-endpoints)"
+  description = "AWS vpce- id from CloudFormation DatabricksSccRelayVpcEndpointId (SCC). Do not pass a Databricks account (MWS) VPC endpoint UUID."
 }
 
 # SRA defaults this to [] (RESTRICTED_ACCESS, no sources). Unity Catalog backend
