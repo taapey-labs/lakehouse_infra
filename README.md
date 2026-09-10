@@ -23,7 +23,7 @@ The template matches SRA isolated (`aws/tf/network.tf` and `privatelink.tf`) for
 | No IGW, no NAT | Same |
 | Private compute subnets | `WorkspaceSubnetA/B` (`/22`) |
 | Intra / PrivateLink subnets | `PrivateLinkSubnetA/B` (`/26`) — **not** workspace subnets |
-| S3 gateway + STS + Kinesis | Same, STS/Kinesis on PrivateLink subnets |
+| S3 gateway + STS + Kinesis + EC2 | STS, Kinesis, and EC2 on PrivateLink subnets |
 | Databricks REST + SCC VPCEs | Same, on PrivateLink subnets |
 | Workspace SG egress to VPC CIDR + S3 prefix list | Same (plus DNS 53) |
 | PrivateLink SG 443/2443/5432/6666/8443–8451 | Same |
