@@ -127,9 +127,10 @@ variable "serverless_private_endpoint_rules" {
   default     = []
 }
 
-variable "catalog_instance_profile_arn" {
+variable "existing_storage_credential_name" {
   type        = string
-  description = "ARN of the existing IAM instance profile whose role is granted access to the additional catalog S3 bucket (arn:aws:iam::<account>:instance-profile/<name>)"
+  description = "Existing Unity Catalog storage credential used for the additional catalog bucket. Defaults to the SRA workspace catalog credential ({resource_prefix}-catalog-{workspace_id}-storage-credential)"
+  default     = null
 }
 
 variable "additional_catalog_name" {

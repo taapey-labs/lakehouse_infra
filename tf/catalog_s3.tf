@@ -1,20 +1,23 @@
-# Additional Unity Catalog catalog on a new S3 bucket, accessed via an existing
-# IAM instance profile (its backing role). Does not replace the SRA workspace catalog.
+# Additional Unity Catalog catalog on a new S3 bucket, using an existing
+# storage credential (no instance profile). Does not replace the SRA workspace catalog.
 
 locals {
   additional_catalog_bucket_name = coalesce(
     var.additional_catalog_bucket_name,
     "${var.resource_prefix}-data-${var.workspace_id}"
   )
-  catalog_instance_profile_name = element(split("instance-profile/", var.catalog_instance_profile_arn), 1)
+  existing_storage_credential_name = coalesce(
+    var.existing_storage_credential_name,
+    "${var.resource_prefix}-catalog-${var.workspace_id}-storage-credential"
+  )
+  existing_credential_role_arn = data.databricks_storage_credential.existing.storage_credential_info[0].aws_iam_role[0].role_arn
+  existing_credential_role_name = element(split("/", local.existing_credential_role_arn), length(split("/", local.existing_credential_role_arn)) - 1)
 }
 
-data "aws_iam_instance_profile" "catalog" {
-  name = local.catalog_instance_profile_name
-}
-
-data "aws_iam_role" "catalog_instance_profile" {
-  name = data.aws_iam_instance_profile.catalog.role_name
+data "databricks_storage_credential" "existing" {
+  provider = databricks.workspace
+  name     = local.existing_storage_credential_name
+  depends_on = [module.databricks_sra]
 }
 
 resource "aws_s3_bucket" "additional_catalog" {
@@ -48,17 +51,17 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "additional_catalo
 }
 
 resource "aws_s3_bucket_policy" "additional_catalog" {
-  bucket = aws_s3_bucket.additional_catalog.id
+  bucket     = aws_s3_bucket.additional_catalog.id
   depends_on = [aws_s3_bucket_public_access_block.additional_catalog]
 
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
       {
-        Sid    = "InstanceProfileRoleAccess"
+        Sid    = "ExistingStorageCredentialRoleAccess"
         Effect = "Allow"
         Principal = {
-          AWS = data.aws_iam_role.catalog_instance_profile.arn
+          AWS = local.existing_credential_role_arn
         }
         Action = [
           "s3:GetObject",
@@ -105,7 +108,7 @@ resource "aws_s3_bucket_policy" "additional_catalog" {
 
 resource "aws_iam_role_policy" "additional_catalog_s3" {
   name = "${var.resource_prefix}-data-catalog-s3"
-  role = data.aws_iam_role.catalog_instance_profile.name
+  role = local.existing_credential_role_name
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -132,50 +135,25 @@ resource "aws_iam_role_policy" "additional_catalog_s3" {
   })
 }
 
-# Register the profile in the workspace if it is not already there (import if apply fails on duplicate).
-resource "databricks_instance_profile" "catalog" {
-  provider             = databricks.workspace
-  instance_profile_arn = var.catalog_instance_profile_arn
-  skip_validation      = true
-  depends_on           = [module.databricks_sra]
-}
-
-resource "databricks_storage_credential" "additional_catalog" {
-  provider = databricks.workspace
-  name     = "${var.additional_catalog_name}-storage-credential"
-
-  aws_iam_role {
-    role_arn = data.aws_iam_role.catalog_instance_profile.arn
-  }
-
-  isolation_mode  = "ISOLATION_MODE_ISOLATED"
-  skip_validation = true
-  comment         = "Storage credential for ${var.additional_catalog_name} using instance profile ${local.catalog_instance_profile_name}"
-
-  depends_on = [
-    module.databricks_sra,
-    aws_iam_role_policy.additional_catalog_s3,
-    aws_s3_bucket_policy.additional_catalog,
-    databricks_instance_profile.catalog,
-  ]
-}
-
 resource "databricks_external_location" "additional_catalog" {
   provider        = databricks.workspace
   name            = "${var.additional_catalog_name}-external-location"
   url             = "s3://${aws_s3_bucket.additional_catalog.id}/"
-  credential_name = databricks_storage_credential.additional_catalog.id
+  credential_name = data.databricks_storage_credential.existing.name
   isolation_mode  = "ISOLATION_MODE_ISOLATED"
   comment         = "External location for catalog ${var.additional_catalog_name}"
   skip_validation = true
 
-  depends_on = [databricks_storage_credential.additional_catalog]
+  depends_on = [
+    aws_iam_role_policy.additional_catalog_s3,
+    aws_s3_bucket_policy.additional_catalog,
+  ]
 }
 
 resource "databricks_catalog" "additional" {
   provider       = databricks.workspace
   name           = var.additional_catalog_name
-  comment        = "Catalog backed by s3://${aws_s3_bucket.additional_catalog.id}/ via instance profile ${local.catalog_instance_profile_name}"
+  comment        = "Catalog backed by s3://${aws_s3_bucket.additional_catalog.id}/ via storage credential ${local.existing_storage_credential_name}"
   isolation_mode = "ISOLATED"
   storage_root   = "s3://${aws_s3_bucket.additional_catalog.id}/"
   properties = {
@@ -186,8 +164,8 @@ resource "databricks_catalog" "additional" {
 }
 
 resource "databricks_grant" "additional_catalog_admin" {
-  provider = databricks.workspace
-  catalog  = databricks_catalog.additional.name
+  provider   = databricks.workspace
+  catalog    = databricks_catalog.additional.name
   principal  = var.admin_user
   privileges = ["ALL_PRIVILEGES"]
 }
