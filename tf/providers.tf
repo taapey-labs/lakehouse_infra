@@ -16,5 +16,12 @@ provider "aws" {
   region = var.aws_region
 }
 
-# The databricks_sra module (in main.tf) configures its own aws/databricks providers
-# internally and authenticates via DATABRICKS_CLIENT_ID/DATABRICKS_CLIENT_SECRET env vars.
+# Account-level provider used to attach a UC-compatible network policy after SRA.
+# SRA still declares its own nested aws/databricks providers for workspace create.
+provider "databricks" {
+  alias         = "accounts"
+  host          = "https://accounts.cloud.databricks.com"
+  account_id    = var.databricks_account_id
+  client_id     = var.databricks_client_id
+  client_secret = var.databricks_client_secret
+}

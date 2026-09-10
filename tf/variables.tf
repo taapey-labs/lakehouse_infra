@@ -105,3 +105,24 @@ variable "cross_workspace_ingress_allowed_workspace_ids" {
   description = "Source workspace IDs allowed to reach this workspace over SRA cross-workspace ingress"
   default     = [7474654246419237]
 }
+
+variable "workspace_id" {
+  type        = number
+  description = "Numeric Databricks workspace ID (7474654246419237). Used to re-bind a UC-compatible network policy after SRA."
+  default     = 7474654246419237
+}
+
+# Option 1: public/context-based ingress IP allow list. Empty = SRA public_access FULL_ACCESS.
+# Set to NAT EIP/CIDRs only if you have already enabled IP restriction on the workspace or metastore.
+variable "context_based_ingress_ip_acl" {
+  type        = list(string)
+  description = "Optional public IPv4 CIDRs allowed to reach the workspace (SRA context-based ingress)"
+  default     = []
+}
+
+# Option 3: extra NCC private endpoint rules for serverless (S3, RDS, etc.).
+variable "serverless_private_endpoint_rules" {
+  type        = any
+  description = "Optional list of Databricks NCC private endpoint rules passed to SRA"
+  default     = []
+}

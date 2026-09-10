@@ -401,3 +401,6 @@ Outputs:
     Value: !Ref DatabricksWorkspaceVpcEndpoint
   DatabricksSccRelayVpcEndpointId:
     Value: !Ref DatabricksSccRelayVpcEndpoint
+  NatPublicIp:
+    Description: NAT gateway EIP. Allow-list this if Unity Catalog or workspace IP access lists require the workspace egress IP.
+    Value: !Ref NatEip
