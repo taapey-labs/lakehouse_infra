@@ -14,7 +14,7 @@ output "unity_catalog_network_policy_id" {
 }
 
 output "additional_catalog_name" {
-  description = "Unity Catalog catalog backed by the new S3 bucket and existing instance profile."
+  description = "Unity Catalog catalog backed by the new S3 bucket and existing storage credential."
   value       = databricks_catalog.additional.name
 }
 
@@ -23,13 +23,12 @@ output "additional_catalog_bucket" {
   value       = aws_s3_bucket.additional_catalog.id
 }
 
-output "additional_catalog_instance_profile_role_arn" {
-  description = "IAM role ARN behind the existing instance profile (granted S3 access)."
-  value       = data.aws_iam_role.catalog_instance_profile.arn
+output "additional_catalog_storage_credential" {
+  description = "Existing Unity Catalog storage credential used for the additional catalog bucket."
+  value       = data.databricks_storage_credential.existing.name
 }
 
-output "additional_catalog_uc_trust_external_id" {
-  description = "sts:ExternalId to add on the instance profile role trust for Unity Catalog (if not already present)."
-  value       = databricks_storage_credential.additional_catalog.aws_iam_role[0].external_id
-  sensitive   = true
+output "additional_catalog_credential_role_arn" {
+  description = "IAM role ARN from the existing storage credential (granted S3 access to the new bucket)."
+  value       = local.existing_credential_role_arn
 }
