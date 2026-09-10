@@ -2,7 +2,7 @@ AWSTemplateFormatVersion: '2010-09-09'
 Description: >-
   Customer-managed VPC for Databricks SRA custom network (HYBRID compute).
   Mirrors SRA isolated networking (no IGW, no NAT, private compute subnets,
-  dedicated PrivateLink subnets, S3/STS/Kinesis plus Databricks REST and SCC
+  dedicated PrivateLink subnets, S3/STS/Kinesis/EC2 plus Databricks REST and SCC
   interface endpoints) so the IDs can be passed into SRA as custom_vpc_id,
   custom_private_subnet_ids, custom_sg_id, custom_general_access_vpce_id, and
   custom_scc_relay_vpce_id.
@@ -89,7 +89,7 @@ Parameters:
   PrivateLinkSubnetACidr:
     Type: String
     Default: 10.10.28.0/26
-    Description: Dedicated PrivateLink subnet A (STS, Kinesis, Databricks REST/SCC). Do not use as a workspace subnet.
+    Description: Dedicated PrivateLink subnet A (STS, Kinesis, EC2, Databricks REST/SCC). Do not use as a workspace subnet.
 
   PrivateLinkSubnetBCidr:
     Type: String
@@ -354,7 +354,7 @@ Resources:
           FromPort: 443
           ToPort: 443
           SourceSecurityGroupId: !Ref DatabricksWorkspaceSecurityGroup
-          Description: REST / STS / Kinesis
+          Description: REST / STS / Kinesis / EC2
         - IpProtocol: tcp
           FromPort: 6666
           ToPort: 6666
@@ -433,6 +433,24 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub ${ProjectName}-kinesis-vpc-endpoint
+        - Key: Project
+          Value: !Ref ProjectName
+
+  Ec2VpcEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref Vpc
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.ec2
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds:
+        - !Ref PrivateLinkSubnetA
+        - !Ref PrivateLinkSubnetB
+      SecurityGroupIds:
+        - !Ref DatabricksEndpointSecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-ec2-vpc-endpoint
         - Key: Project
           Value: !Ref ProjectName
 
@@ -540,5 +558,7 @@ Outputs:
     Value: !Ref StsVpcEndpoint
   KinesisVpcEndpointId:
     Value: !Ref KinesisVpcEndpoint
+  Ec2VpcEndpointId:
+    Value: !Ref Ec2VpcEndpoint
   S3GatewayEndpointId:
     Value: !Ref S3GatewayEndpoint
