@@ -19,12 +19,9 @@ module "databricks_sra" {
 
   custom_vpc_id                 = var.custom_vpc_id
   custom_private_subnet_ids     = var.custom_private_subnet_ids
-  custom_sg_id                  = var.custom_sg_id
-  custom_general_access_vpce_id = var.custom_general_access_vpce_id
-  custom_scc_relay_vpce_id      = var.custom_scc_relay_vpce_id
+  # custom_general_access_vpce_id = var.custom_general_access_vpce_id
+  # custom_scc_relay_vpce_id      = var.custom_scc_relay_vpce_id
   sg_egress_ports = var.sg_egress_ports
-  custom_general_access_mws_vpce_id = var.custom_general_access_mws_vpce_id
-  custom_scc_relay_mws_vpce_id      = var.custom_scc_relay_mws_vpce_id
 
   databricks_client_id     = var.databricks_client_id
   databricks_client_secret = var.databricks_client_secret
