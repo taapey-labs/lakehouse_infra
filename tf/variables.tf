@@ -108,7 +108,7 @@ variable "cross_workspace_ingress_allowed_workspace_ids" {
 
 variable "workspace_id" {
   type        = number
-  description = "Numeric Databricks workspace ID (7474654246419237). Used to re-bind a UC-compatible network policy after SRA."
+  description = "Numeric Databricks workspace ID (7474654246419237). Used to name the additional catalog bucket and default credential/role."
   default     = 7474654246419237
 }
 
