@@ -1,11 +1,10 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: >-
-  Customer-managed VPC for a Databricks classic workspace.
-  Creates a /25 VPC with two private /26 workspace subnets (one per AZ),
-  a small public subnet for the NAT gateway, the required Databricks security
-  group, and AWS PrivateLink interface endpoints (front-end + back-end) for
-  private connectivity to Databricks.
-  Ref: https://docs.databricks.com/aws/en/security/network/classic/customer-managed-vpc
+Description: 'Customer-managed VPC for a Databricks classic workspace. Creates a
+  /25 VPC with two private /26 workspace subnets (one per AZ), a small public
+  subnet for the NAT gateway, the required Databricks security group, and AWS
+  PrivateLink interface endpoints (front-end + back-end) for private
+  connectivity to Databricks. Ref:
+  https://docs.databricks.com/aws/en/security/network/classic/customer-managed-vpc'
 
 Parameters:
   ProjectName:
@@ -21,7 +20,8 @@ Parameters:
   NatSubnetCidr:
     Type: String
     Default: 10.10.1.0/28
-    Description: Small secondary CIDR used only for the public NAT subnet (added as a secondary VPC CIDR block)
+    Description: Small secondary CIDR used only for the public NAT subnet (added as
+      a secondary VPC CIDR block)
 
   WorkspaceSubnetACidr:
     Type: String
@@ -43,21 +43,19 @@ Parameters:
 
   DatabricksWorkspaceVpceServiceName:
     Type: String
-    Description: >-
-      AWS PrivateLink service name for the Databricks workspace (REST API) endpoint.
-      Region-specific; look up the exact value for your workspace region in the
-      "PrivateLink VPC endpoint services" table:
+    Description: 'AWS PrivateLink service name for the Databricks workspace (REST
+      API) endpoint. Region-specific; look up the exact value for your workspace
+      region in the "PrivateLink VPC endpoint services" table:
       https://docs.databricks.com/aws/en/resources/ip-domain-region#privatelink
-      Format: com.amazonaws.vpce.<region>.vpce-svc-xxxxxxxxxxxxxxxxx
+      Format: com.amazonaws.vpce.<region>.vpce-svc-xxxxxxxxxxxxxxxxx'
 
   DatabricksSccRelayVpceServiceName:
     Type: String
-    Description: >-
-      AWS PrivateLink service name for the Databricks secure cluster connectivity (SCC) relay.
-      Region-specific; look up the exact value for your workspace region in the
-      "PrivateLink VPC endpoint services" table:
+    Description: 'AWS PrivateLink service name for the Databricks secure cluster
+      connectivity (SCC) relay. Region-specific; look up the exact value for
+      your workspace region in the "PrivateLink VPC endpoint services" table:
       https://docs.databricks.com/aws/en/resources/ip-domain-region#privatelink
-      Format: com.amazonaws.vpce.<region>.vpce-svc-xxxxxxxxxxxxxxxxx
+      Format: com.amazonaws.vpce.<region>.vpce-svc-xxxxxxxxxxxxxxxxx'
 
 Resources:
   Vpc:
@@ -68,7 +66,7 @@ Resources:
       EnableDnsHostnames: true
       Tags:
         - Key: Name
-          Value: !Sub '${ProjectName}-databricks-vpc'
+          Value: !Sub ${ProjectName}-databricks-vpc
 
   NatCidrBlock:
     Type: AWS::EC2::VPCCidrBlock
@@ -81,7 +79,7 @@ Resources:
     Properties:
       Tags:
         - Key: Name
-          Value: !Sub '${ProjectName}-databricks-igw'
+          Value: !Sub ${ProjectName}-databricks-igw
 
   VpcGatewayAttachment:
     Type: AWS::EC2::VPCGatewayAttachment
@@ -99,7 +97,7 @@ Resources:
       MapPublicIpOnLaunch: false
       Tags:
         - Key: Name
-          Value: !Sub '${ProjectName}-databricks-private-a'
+          Value: !Sub ${ProjectName}-databricks-private-a
 
   WorkspaceSubnetB:
     Type: AWS::EC2::Subnet
@@ -110,7 +108,7 @@ Resources:
       MapPublicIpOnLaunch: false
       Tags:
         - Key: Name
-          Value: !Sub '${ProjectName}-databricks-private-b'
+          Value: !Sub ${ProjectName}-databricks-private-b
 
   # --- Public subnet dedicated to the NAT gateway ---
   NatSubnet:
@@ -123,7 +121,7 @@ Resources:
       MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
-          Value: !Sub '${ProjectName}-databricks-nat'
+          Value: !Sub ${ProjectName}-databricks-nat
 
   NatEip:
     Type: AWS::EC2::EIP
@@ -137,7 +135,7 @@ Resources:
       SubnetId: !Ref NatSubnet
       Tags:
         - Key: Name
-          Value: !Sub '${ProjectName}-databricks-natgw'
+          Value: !Sub ${ProjectName}-databricks-natgw
 
   PublicRouteTable:
     Type: AWS::EC2::RouteTable
@@ -145,7 +143,7 @@ Resources:
       VpcId: !Ref Vpc
       Tags:
         - Key: Name
-          Value: !Sub '${ProjectName}-databricks-public-rt'
+          Value: !Sub ${ProjectName}-databricks-public-rt
 
   PublicDefaultRoute:
     Type: AWS::EC2::Route
@@ -168,7 +166,7 @@ Resources:
       VpcId: !Ref Vpc
       Tags:
         - Key: Name
-          Value: !Sub '${ProjectName}-databricks-private-rt'
+          Value: !Sub ${ProjectName}-databricks-private-rt
 
   PrivateDefaultRoute:
     Type: AWS::EC2::Route
@@ -197,7 +195,7 @@ Resources:
       VpcId: !Ref Vpc
       Tags:
         - Key: Name
-          Value: !Sub '${ProjectName}-databricks-sg'
+          Value: !Sub ${ProjectName}-databricks-sg
 
   SgIngressSelfTcp:
     Type: AWS::EC2::SecurityGroupIngress
@@ -311,30 +309,28 @@ Resources:
           ToPort: 443
           SourceSecurityGroupId: !Ref DatabricksWorkspaceSecurityGroup
         - IpProtocol: tcp
-          FromPort: 2443
-          ToPort: 2443
-          SourceSecurityGroupId: !Ref DatabricksWorkspaceSecurityGroup
-        - IpProtocol: tcp
           FromPort: 6666
           ToPort: 6666
           SourceSecurityGroupId: !Ref DatabricksWorkspaceSecurityGroup
+        - IpProtocol: tcp
+          FromPort: 2443
+          ToPort: 2443
+          SourceSecurityGroupId: !Ref DatabricksWorkspaceSecurityGroup
       Tags:
         - Key: Name
-          Value: !Sub '${ProjectName}-databricks-vpce-sg'
+          Value: !Sub ${ProjectName}-databricks-vpce-sg
 
   # --- S3 gateway endpoint (recommended regional endpoint, no extra cost) ---
   S3GatewayEndpoint:
     Type: AWS::EC2::VPCEndpoint
     Properties:
       VpcId: !Ref Vpc
-      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.s3'
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.s3
       VpcEndpointType: Gateway
       RouteTableIds:
         - !Ref PrivateRouteTable
 
-  # REST / General Access. Private DNS name is ncalifornia.privatelink.cloud.databricks.com
-  # (us-west-1). That zone can also answer tunnel.privatelink.cloud.databricks.com via a
-  # parent wildcard, which sends SCC traffic to the REST NLB (connection refused on 2443/6666).
+  # --- Private (PrivateLink) endpoints for Databricks front-end/back-end connectivity ---
   DatabricksWorkspaceVpcEndpoint:
     Type: AWS::EC2::VPCEndpoint
     Properties:
@@ -348,8 +344,6 @@ Resources:
       SecurityGroupIds:
         - !Ref DatabricksEndpointSecurityGroup
 
-  # SCC relay. Do not enable AWS-managed private DNS here: it fights the REST endpoint's
-  # privatelink.cloud.databricks.com zone. Pin tunnel.* with an explicit hosted zone below.
   DatabricksSccRelayVpcEndpoint:
     Type: AWS::EC2::VPCEndpoint
     Properties:
@@ -384,8 +378,20 @@ Resources:
       Name: tunnel.privatelink.cloud.databricks.com
       Type: A
       AliasTarget:
-        HostedZoneId: !Select [0, !Split [':', !Select [0, !GetAtt DatabricksSccRelayVpcEndpoint.DnsEntries]]]
-        DNSName: !Select [1, !Split [':', !Select [0, !GetAtt DatabricksSccRelayVpcEndpoint.DnsEntries]]]
+        HostedZoneId: !Select
+          - 0
+          - !Split
+            - ':'
+            - !Select
+              - 0
+              - !GetAtt DatabricksSccRelayVpcEndpoint.DnsEntries
+        DNSName: !Select
+          - 1
+          - !Split
+            - ':'
+            - !Select
+              - 0
+              - !GetAtt DatabricksSccRelayVpcEndpoint.DnsEntries
         EvaluateTargetHealth: false
 
 Outputs:
