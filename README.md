@@ -23,11 +23,20 @@ terraform apply \
 
 This configuration deploys a Databricks workspace in AWS with `compute_mode = "HYBRID"` and `network_configuration = "custom"`.
 
-## Unity Catalog 403 (`Unauthorized network access to workspace`)
+## Unity Catalog 403 (`Unauthorized network access to workspace` / `KCUC4`)
 
-SRA attaches a restrictive network policy with cross-workspace ingress set to `RESTRICTED_ACCESS` and an empty allow list. Unity Catalog backend calls into the workspace then fail with HTTP 403 / `KCUC4`.
+This exact body is **Databricks denying a network path into workspace `7474654246419237`**, not a missing GRANT. Checked against the four usual causes:
 
-Workspace `7474654246419237` is allow-listed as a cross-workspace ingress source via `cross_workspace_ingress_allowed_workspace_ids`. Re-apply Terraform so the `{resource_prefix}-np` policy picks up the rule. To allow additional source workspaces, pass more IDs in that variable.
+| Check | What this repo does | Verdict for KCUC4 |
+|---|---|---|
+| **1. UC / workspace network access (IP lists, perimeters, ingress policy)** | SRA attaches `{prefix}-np` with **cross-workspace `RESTRICTED_ACCESS`**. Allow-listing workspace `7474654246419237` as a *source* does not authorize the **Unity Catalog backend**. No workspace IP access list is created here. Public ingress stays `FULL_ACCESS` unless you set `context_based_ingress_ip_acl`. NAT EIP is stack output `NatPublicIp` if you must allow-list egress IPs elsewhere. | **This is the match.** Terraform now creates `{prefix}-uc-ingress-np` (cross-workspace **`FULL_ACCESS`**, private = all registered endpoints, public = full unless IP ACL) and rebinds workspace `7474654246419237` after SRA. |
+| **2. Metastore / catalog workspace binding** | SRA assigns the regional metastore (`metastore_exists = true` reuses it) and creates an **ISOLATED** workspace catalog plus isolated storage credential / external location, auto-bound to this workspace. | Not this error string. Same-workspace use is bound. Cross-workspace table access would need `databricks_workspace_binding`, and would not say “Unauthorized network access”. |
+| **3. Serverless NCC** | SRA always creates `{prefix}-ncc` and binds it. Default NCC has **no** extra private endpoint rules (`serverless_private_endpoint_rules`). Overlay policy sets serverless **egress `FULL_ACCESS`** so UC is not blocked by SRA’s empty restricted allow list (implicit UC allowlisting is deprecated). | Relevant for serverless SQL/warehouses; NCC mapping exists. Add PE rules only if serverless must reach private AWS services. |
+| **4. Cloud storage firewall / S3 bucket policy** | Catalog bucket is created with public-access block and CMK; it is **not** limited to the VPC. Root workspace bucket gets SRA’s restrictive policy. | A storage 403 looks like S3 `AccessDenied`, not `KCUC4` / “Unauthorized network access to workspace”. |
+
+Apply Terraform after merge. Account Console → Security → Networking should show workspace `7474654246419237` on `{resource_prefix}-uc-ingress-np`, not only `{resource_prefix}-np`. Then retry the UC command.
+
+SRA will keep managing `{prefix}-np`; this overlay rebinds the workspace at the end of each apply. Do not re-attach `{prefix}-np` in the console.
 
 ## Classic cluster NPIP / ngrok timeout (`tunnel.privatelink.cloud.databricks.com:2443`)
 
