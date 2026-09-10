@@ -25,3 +25,10 @@ provider "databricks" {
   client_id     = var.databricks_client_id
   client_secret = var.databricks_client_secret
 }
+
+provider "databricks" {
+  alias         = "workspace"
+  host          = module.databricks_sra.workspace_host
+  client_id     = var.databricks_client_id
+  client_secret = var.databricks_client_secret
+}

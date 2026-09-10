@@ -126,3 +126,20 @@ variable "serverless_private_endpoint_rules" {
   description = "Optional list of Databricks NCC private endpoint rules passed to SRA"
   default     = []
 }
+
+variable "catalog_instance_profile_arn" {
+  type        = string
+  description = "ARN of the existing IAM instance profile whose role is granted access to the additional catalog S3 bucket (arn:aws:iam::<account>:instance-profile/<name>)"
+}
+
+variable "additional_catalog_name" {
+  type        = string
+  description = "Unity Catalog name for the additional catalog backed by the new S3 bucket"
+  default     = "lakehouse_data"
+}
+
+variable "additional_catalog_bucket_name" {
+  type        = string
+  description = "Globally unique S3 bucket name for the additional catalog. Defaults to {resource_prefix}-data-{workspace_id}"
+  default     = null
+}
