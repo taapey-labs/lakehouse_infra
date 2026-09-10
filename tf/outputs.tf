@@ -25,10 +25,10 @@ output "additional_catalog_bucket" {
 
 output "additional_catalog_storage_credential" {
   description = "Existing Unity Catalog storage credential used for the additional catalog bucket."
-  value       = data.databricks_storage_credential.existing.name
+  value       = local.existing_storage_credential_name
 }
 
 output "additional_catalog_credential_role_arn" {
   description = "IAM role ARN from the existing storage credential (granted S3 access to the new bucket)."
-  value       = local.existing_credential_role_arn
+  value       = data.aws_iam_role.existing_credential.arn
 }

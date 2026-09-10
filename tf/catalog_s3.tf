@@ -1,5 +1,9 @@
 # Additional Unity Catalog catalog on a new S3 bucket, using an existing
 # storage credential (no instance profile). Does not replace the SRA workspace catalog.
+#
+# Do not look up the credential via data.databricks_storage_credential: that data source
+# often returns an empty storage_credential_info list (Invalid index). Pass the credential
+# name through to the external location, and grant S3 on the existing credential IAM role.
 
 locals {
   additional_catalog_bucket_name = coalesce(
@@ -10,14 +14,14 @@ locals {
     var.existing_storage_credential_name,
     "${var.resource_prefix}-catalog-${var.workspace_id}-storage-credential"
   )
-  existing_credential_role_arn = data.databricks_storage_credential.existing.storage_credential_info[0].aws_iam_role[0].role_arn
-  existing_credential_role_name = element(split("/", local.existing_credential_role_arn), length(split("/", local.existing_credential_role_arn)) - 1)
+  existing_credential_role_name = coalesce(
+    var.existing_storage_credential_role_name,
+    "${var.resource_prefix}-catalog-${var.workspace_id}"
+  )
 }
 
-data "databricks_storage_credential" "existing" {
-  provider = databricks.workspace
-  name     = local.existing_storage_credential_name
-  depends_on = [module.databricks_sra]
+data "aws_iam_role" "existing_credential" {
+  name = local.existing_credential_role_name
 }
 
 resource "aws_s3_bucket" "additional_catalog" {
@@ -61,7 +65,7 @@ resource "aws_s3_bucket_policy" "additional_catalog" {
         Sid    = "ExistingStorageCredentialRoleAccess"
         Effect = "Allow"
         Principal = {
-          AWS = local.existing_credential_role_arn
+          AWS = data.aws_iam_role.existing_credential.arn
         }
         Action = [
           "s3:GetObject",
@@ -139,7 +143,7 @@ resource "databricks_external_location" "additional_catalog" {
   provider        = databricks.workspace
   name            = "${var.additional_catalog_name}-external-location"
   url             = "s3://${aws_s3_bucket.additional_catalog.id}/"
-  credential_name = data.databricks_storage_credential.existing.name
+  credential_name = local.existing_storage_credential_name
   isolation_mode  = "ISOLATION_MODE_ISOLATED"
   comment         = "External location for catalog ${var.additional_catalog_name}"
   skip_validation = true
