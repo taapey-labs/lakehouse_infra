@@ -62,3 +62,26 @@ nc -zv tunnel.privatelink.cloud.databricks.com 2443      # succeeded, not connec
 nc -zv tunnel.privatelink.cloud.databricks.com 6666
 ```
 
+## Additional catalog S3 bucket (existing instance profile)
+
+Terraform creates a new bucket (`{resource_prefix}-data-{workspace_id}` by default), grants the **existing instance profile’s IAM role** access on that bucket, registers the profile in the workspace, and creates Unity Catalog objects:
+
+- storage credential (the instance profile role)
+- external location `s3://<bucket>/`
+- catalog `lakehouse_data` (override with `additional_catalog_name`)
+- `ALL_PRIVILEGES` for `admin_user`
+
+Required variable:
+
+```bash
+terraform apply -var="catalog_instance_profile_arn=arn:aws:iam::<account>:instance-profile/<name>"
+```
+
+The instance profile role must trust Databricks Unity Catalog (`arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL`) with `sts:ExternalId` equal to the storage credential external ID (output `additional_catalog_uc_trust_external_id`). If that role is already a UC catalog role, trust is likely already present.
+
+If `databricks_instance_profile` fails because the profile is already registered, import it:
+
+```bash
+terraform import databricks_instance_profile.catalog arn:aws:iam::<account>:instance-profile/<name>
+```
+
