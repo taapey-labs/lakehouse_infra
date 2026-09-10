@@ -133,6 +133,12 @@ variable "existing_storage_credential_name" {
   default     = null
 }
 
+variable "existing_storage_credential_role_name" {
+  type        = string
+  description = "IAM role name used by that storage credential. Defaults to the SRA catalog role ({resource_prefix}-catalog-{workspace_id})"
+  default     = null
+}
+
 variable "additional_catalog_name" {
   type        = string
   description = "Unity Catalog name for the additional catalog backed by the new S3 bucket"

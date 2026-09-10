@@ -66,7 +66,7 @@ nc -zv tunnel.privatelink.cloud.databricks.com 6666
 
 Terraform creates a new bucket (`{resource_prefix}-data-{workspace_id}` by default) and grants the **existing Unity Catalog storage credential’s IAM role** access on that bucket. No instance profile is created or required.
 
-By default the credential is the SRA workspace catalog one: `{resource_prefix}-catalog-{workspace_id}-storage-credential`. Override with `existing_storage_credential_name`.
+By default the credential is the SRA workspace catalog one: `{resource_prefix}-catalog-{workspace_id}-storage-credential`, and the IAM role is `{resource_prefix}-catalog-{workspace_id}`. Override with `existing_storage_credential_name` and `existing_storage_credential_role_name` if yours differ.
 
 Also created:
 
