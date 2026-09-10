@@ -4,8 +4,9 @@ variable "aws_region" {
 }
 
 variable "vpc_cidr" {
-  type    = string
-  default = "10.0.0.0/23"
+  type        = string
+  default     = "10.10.0.0/18"
+  description = "Documentation-only CIDR matching vpc_customer.manage.template VpcCidr (SRA custom VPC is created in CloudFormation, not Terraform)"
 }
 
 variable "databricks_account_id" {

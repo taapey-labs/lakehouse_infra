@@ -1,65 +1,96 @@
 # lakehouse_infra
 
-Terraform starter code to deploy a Databricks serverless workspace on AWS.
+Terraform wrapper around pinned Databricks SRA (`compute_mode = HYBRID`, `network_configuration = custom`) plus a CloudFormation customer VPC that mirrors SRA **isolated** networking.
+
+SRA custom mode does not create a VPC. Isolated-style networking is defined in `cf/vpc_customer.manage.template`, then IDs are passed into Terraform as `custom_*` variables.
+
+See [SRA AWS getting started](https://databricks.github.io/terraform-databricks-sra/docs/usage/AWS/gettingstarted/) (use the **custom** variables, not isolated CIDR variables, in Terraform).
 
 ## Files
 
-- `versions.tf` - Terraform and provider requirements
-- `variables.tf` - Inputs for the Databricks account, workspace name, and AWS region
-- `main.tf` - Account-level Databricks workspace deployment
-- `outputs.tf` - Workspace identifiers and URL
+- `cf/vpc_customer.manage.template` - Customer VPC, PrivateLink, workspace SG
+- `tf/main.tf` - SRA module
+- `tf/variables.tf` - Inputs, including CloudFormation stack outputs
+- `tf/outputs.tf` - Workspace URL and catalog name
+- `tf/backend.tf` - S3/DynamoDB state
 
-## Usage
+## 1. CloudFormation customer VPC (isolated-style, custom IDs)
 
-Set the required Databricks authentication environment variables for the account-level provider, then apply Terraform:
+The template matches SRA isolated (`aws/tf/network.tf` and `privatelink.tf`) for a **two-AZ** region such as `us-west-1`:
+
+| Isolated SRA | This template |
+| --- | --- |
+| No IGW, no NAT | Same |
+| Private compute subnets | `WorkspaceSubnetA/B` (`/22`) |
+| Intra / PrivateLink subnets | `PrivateLinkSubnetA/B` (`/26`) — **not** workspace subnets |
+| S3 gateway + STS + Kinesis | Same, STS/Kinesis on PrivateLink subnets |
+| Databricks REST + SCC VPCEs | Same, on PrivateLink subnets |
+| Workspace SG egress to VPC CIDR + S3 prefix list | Same (plus DNS 53) |
+| PrivateLink SG 443/2443/5432/6666/8443–8451 | Same |
+
+Differences from stock isolated SRA (required for classic NPIP):
+
+- REST VPCE keeps AWS private DNS (`ncalifornia.privatelink.cloud.databricks.com`)
+- SCC VPCE private DNS is **off**
+- Route 53 aliases `tunnel.privatelink.cloud.databricks.com` to the SCC endpoint
+
+Defaults are `10.10.0.0/18` with us-west-1 PrivateLink service names. Changing CIDRs on an existing stack replaces the VPC/subnets/VPCEs; pass the current CIDRs to update in place, or create a new stack.
+
+Deploy (example):
 
 ```bash
-terraform init
-terraform apply \
-  -var="databricks_account_id=<account-id>" \
-  -var="workspace_name=<workspace-name>" \
-  -var="aws_region=us-east-1"
+aws cloudformation deploy \
+  --stack-name vpc-customer-manage \
+  --template-file cf/vpc_customer.manage.template \
+  --parameter-overrides \
+    ProjectName=lakehouse \
+    AvailabilityZoneA=us-west-1a \
+    AvailabilityZoneB=us-west-1c
 ```
 
-This configuration deploys a Databricks workspace in AWS with `compute_mode = "HYBRID"` and `network_configuration = "custom"`.
+Map stack outputs to SRA:
+
+| CloudFormation output | Terraform variable |
+| --- | --- |
+| `VpcId` | `custom_vpc_id` |
+| `WorkspaceSubnetAId`, `WorkspaceSubnetBId` | `custom_private_subnet_ids` |
+| `DatabricksSecurityGroupId` | `custom_sg_id` |
+| `DatabricksWorkspaceVpcEndpointId` | `custom_general_access_vpce_id` |
+| `DatabricksSccRelayVpcEndpointId` | `custom_scc_relay_vpce_id` |
+
+Do **not** put PrivateLink subnet IDs in `custom_private_subnet_ids`. Those are for interface endpoints only.
+
+If VPCEs are already registered in the Databricks account, set `custom_general_access_mws_vpce_id` / `custom_scc_relay_mws_vpce_id` instead of re-registering.
+
+After a stack update that replaces VPCEs, pass the new endpoint IDs into Terraform.
+
+## 2. Terraform SRA workspace
+
+```bash
+terraform -chdir=tf init
+terraform -chdir=tf apply \
+  -var="databricks_account_id=<account-id>" \
+  -var="aws_region=us-west-1" \
+  -var="custom_vpc_id=vpc-..." \
+  -var='custom_private_subnet_ids=["subnet-...","subnet-..."]' \
+  -var="custom_sg_id=sg-..." \
+  -var="custom_general_access_vpce_id=vpce-..." \
+  -var="custom_scc_relay_vpce_id=vpce-..."
+```
+
+Auth: AWS credential chain plus `DATABRICKS_CLIENT_ID` / `DATABRICKS_CLIENT_SECRET` (and matching Terraform variables).
 
 This Databricks account does not support `ingress.cross_workspace_access` on account network policies, so this repo does not create `{prefix}-uc-ingress-np`.
 
-`audit_log_delivery_exists` defaults to `true` so SRA does not recreate `{prefix}-audit-log-delivery-credential` when that MWS credential already exists on the account. Set it to `false` only for a brand-new account that has never had audit log delivery configured.
+`audit_log_delivery_exists` defaults to `true` so SRA does not recreate `{prefix}-audit-log-delivery-credential` when that MWS credential already exists. Set it to `false` only for a brand-new account that has never had audit log delivery configured.
 
 ## Classic cluster NPIP / ngrok timeout (`tunnel.privatelink.cloud.databricks.com:2443`)
 
-Classic compute over PrivateLink opens an SCC (ngrok) tunnel to the relay VPC endpoint. That path uses TCP **2443** (FIPS) as well as **6666**. The customer VPC template must allow:
-
-- Workspace SG egress TCP 2443 and 6666
-- PrivateLink endpoint SG ingress TCP 2443 and 6666 from the workspace SG
-
-The workspace/REST VPC endpoint private DNS name is `ncalifornia.privatelink.cloud.databricks.com`. That is **not** the SCC relay. Classic compute looks up `tunnel.privatelink.cloud.databricks.com`. If that name resolves to the REST ENIs, `nc` to 2443/6666 returns **connection refused**.
-
-The template now:
-
-- Leaves REST private DNS on (`ncalifornia.privatelink.cloud.databricks.com`)
-- Turns **off** AWS-managed private DNS on the SCC endpoint
-- Creates a Route 53 private zone that aliases `tunnel.privatelink.cloud.databricks.com` to the SCC VPC endpoint
-
-Update the `vpc_customer.manage` CloudFormation stack, then restart the classic cluster. From a workspace subnet, confirm the two names resolve to **different** IPs:
+Classic compute over PrivateLink opens an SCC (ngrok) tunnel to the relay VPC endpoint (TCP **2443** FIPS and **6666**). After the stack is current, restart the classic cluster. From a workspace subnet:
 
 ```bash
 nslookup ncalifornia.privatelink.cloud.databricks.com   # REST VPCE ENIs
 nslookup tunnel.privatelink.cloud.databricks.com         # SCC VPCE ENIs (not the REST pair)
-nc -zv tunnel.privatelink.cloud.databricks.com 2443      # succeeded, not connection refused
+nc -zv tunnel.privatelink.cloud.databricks.com 2443
 nc -zv tunnel.privatelink.cloud.databricks.com 6666
 ```
-
-## Additional catalog S3 bucket (existing storage credential)
-
-Terraform creates a new bucket (`{resource_prefix}-data-{workspace_id}` by default) and grants the **existing Unity Catalog storage credential’s IAM role** access on that bucket. No instance profile is created or required.
-
-By default the credential is the SRA workspace catalog one: `{resource_prefix}-catalog-{workspace_id}-storage-credential`, and the IAM role is `{resource_prefix}-catalog-{workspace_id}`. Override with `existing_storage_credential_name` and `existing_storage_credential_role_name` if yours differ.
-
-Also created:
-
-- isolated external location `s3://<bucket>/`
-- catalog `lakehouse_data` (override with `additional_catalog_name`)
-- `ALL_PRIVILEGES` for `admin_user`
-
