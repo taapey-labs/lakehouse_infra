@@ -1,8 +1,8 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: 'Customer-managed VPC for a Databricks classic workspace. Creates a
-  /25 VPC with two private /26 workspace subnets (one per AZ), a small public
-  subnet for the NAT gateway, the required Databricks security group, and AWS
-  PrivateLink interface endpoints (front-end + back-end) for private
+  /25 VPC with two private /26 workspace subnets (one per AZ), two public /26
+  endpoint subnets (one per AZ), the required Databricks security group, and
+  AWS PrivateLink interface endpoints (front-end + back-end) for private
   connectivity to Databricks. Ref:
   https://docs.databricks.com/aws/en/security/network/classic/customer-managed-vpc'
 
@@ -17,11 +17,10 @@ Parameters:
     Default: 10.10.0.0/25
     Description: Primary VPC CIDR (/25), fully consumed by the two /26 workspace subnets
 
-  NatSubnetCidr:
+  PublicEndpointCidr:
     Type: String
-    Default: 10.10.1.0/28
-    Description: Small secondary CIDR used only for the public NAT subnet (added as
-      a secondary VPC CIDR block)
+    Default: 10.10.2.0/24
+    Description: Secondary VPC CIDR block reserved for the two public endpoint subnets
 
   WorkspaceSubnetACidr:
     Type: String
@@ -33,9 +32,19 @@ Parameters:
     Default: 10.10.0.64/26
     Description: Databricks private workspace subnet B (/26)
 
+  PublicEndpointSubnetACidr:
+    Type: String
+    Default: 10.10.2.0/26
+    Description: Public endpoint subnet A for Databricks-facing VPC endpoints (STS/Kinesis)
+
+  PublicEndpointSubnetBCidr:
+    Type: String
+    Default: 10.10.2.64/26
+    Description: Public endpoint subnet B for Databricks-facing VPC endpoints (STS/Kinesis)
+
   AvailabilityZoneA:
     Type: AWS::EC2::AvailabilityZone::Name
-    Description: AZ for workspace subnet A / NAT gateway
+    Description: AZ for workspace subnet A
 
   AvailabilityZoneB:
     Type: AWS::EC2::AvailabilityZone::Name
@@ -68,24 +77,11 @@ Resources:
         - Key: Name
           Value: !Sub ${ProjectName}-databricks-vpc
 
-  NatCidrBlock:
+  PublicEndpointCidrBlock:
     Type: AWS::EC2::VPCCidrBlock
     Properties:
       VpcId: !Ref Vpc
-      CidrBlock: !Ref NatSubnetCidr
-
-  InternetGateway:
-    Type: AWS::EC2::InternetGateway
-    Properties:
-      Tags:
-        - Key: Name
-          Value: !Sub ${ProjectName}-databricks-igw
-
-  VpcGatewayAttachment:
-    Type: AWS::EC2::VPCGatewayAttachment
-    Properties:
-      VpcId: !Ref Vpc
-      InternetGatewayId: !Ref InternetGateway
+      CidrBlock: !Ref PublicEndpointCidr
 
   # --- Databricks private workspace subnets (2x /26, one per AZ) ---
   WorkspaceSubnetA:
@@ -110,32 +106,30 @@ Resources:
         - Key: Name
           Value: !Sub ${ProjectName}-databricks-private-b
 
-  # --- Public subnet dedicated to the NAT gateway ---
-  NatSubnet:
+  # --- Public subnets for Databricks public endpoint resources (S3/STS/Kinesis) ---
+  PublicEndpointSubnetA:
     Type: AWS::EC2::Subnet
-    DependsOn: NatCidrBlock
+    DependsOn: PublicEndpointCidrBlock
     Properties:
       VpcId: !Ref Vpc
-      CidrBlock: !Ref NatSubnetCidr
+      CidrBlock: !Ref PublicEndpointSubnetACidr
       AvailabilityZone: !Ref AvailabilityZoneA
       MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
-          Value: !Sub ${ProjectName}-databricks-nat
+          Value: !Sub ${ProjectName}-databricks-public-endpoint-a
 
-  NatEip:
-    Type: AWS::EC2::EIP
+  PublicEndpointSubnetB:
+    Type: AWS::EC2::Subnet
+    DependsOn: PublicEndpointCidrBlock
     Properties:
-      Domain: vpc
-
-  NatGateway:
-    Type: AWS::EC2::NatGateway
-    Properties:
-      AllocationId: !GetAtt NatEip.AllocationId
-      SubnetId: !Ref NatSubnet
+      VpcId: !Ref Vpc
+      CidrBlock: !Ref PublicEndpointSubnetBCidr
+      AvailabilityZone: !Ref AvailabilityZoneB
+      MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
-          Value: !Sub ${ProjectName}-databricks-natgw
+          Value: !Sub ${ProjectName}-databricks-public-endpoint-b
 
   PublicRouteTable:
     Type: AWS::EC2::RouteTable
@@ -145,21 +139,19 @@ Resources:
         - Key: Name
           Value: !Sub ${ProjectName}-databricks-public-rt
 
-  PublicDefaultRoute:
-    Type: AWS::EC2::Route
-    DependsOn: VpcGatewayAttachment
-    Properties:
-      RouteTableId: !Ref PublicRouteTable
-      DestinationCidrBlock: 0.0.0.0/0
-      GatewayId: !Ref InternetGateway
-
-  NatSubnetRouteTableAssociation:
+  PublicEndpointSubnetARouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      SubnetId: !Ref NatSubnet
+      SubnetId: !Ref PublicEndpointSubnetA
       RouteTableId: !Ref PublicRouteTable
 
-  # --- Private route table for the two workspace subnets (quad-zero -> NAT) ---
+  PublicEndpointSubnetBRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicEndpointSubnetB
+      RouteTableId: !Ref PublicRouteTable
+
+  # --- Private route table for the two workspace subnets (no NAT; rely on PrivateLink and public endpoint subnets) ---
   PrivateRouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
@@ -167,13 +159,6 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub ${ProjectName}-databricks-private-rt
-
-  PrivateDefaultRoute:
-    Type: AWS::EC2::Route
-    Properties:
-      RouteTableId: !Ref PrivateRouteTable
-      DestinationCidrBlock: 0.0.0.0/0
-      NatGatewayId: !Ref NatGateway
 
   WorkspaceSubnetARouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
@@ -320,7 +305,7 @@ Resources:
         - Key: Name
           Value: !Sub ${ProjectName}-databricks-vpce-sg
 
-  # --- S3 gateway endpoint (recommended regional endpoint, no extra cost) ---
+  # --- Gateway endpoint for S3 ---
   S3GatewayEndpoint:
     Type: AWS::EC2::VPCEndpoint
     Properties:
@@ -329,6 +314,34 @@ Resources:
       VpcEndpointType: Gateway
       RouteTableIds:
         - !Ref PrivateRouteTable
+        - !Ref PublicRouteTable
+
+  # --- Interface endpoints for public egress-dependent AWS services (STS, Kinesis) ---
+  StsVpcEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref Vpc
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.sts
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds:
+        - !Ref PublicEndpointSubnetA
+        - !Ref PublicEndpointSubnetB
+      SecurityGroupIds:
+        - !Ref DatabricksEndpointSecurityGroup
+
+  KinesisVpcEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref Vpc
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.kinesis-streams
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds:
+        - !Ref PublicEndpointSubnetA
+        - !Ref PublicEndpointSubnetB
+      SecurityGroupIds:
+        - !Ref DatabricksEndpointSecurityGroup
 
   # --- Private (PrivateLink) endpoints for Databricks front-end/back-end connectivity ---
   DatabricksWorkspaceVpcEndpoint:
@@ -401,12 +414,13 @@ Outputs:
     Value: !Ref WorkspaceSubnetA
   WorkspaceSubnetBId:
     Value: !Ref WorkspaceSubnetB
+  PublicEndpointSubnetAId:
+    Value: !Ref PublicEndpointSubnetA
+  PublicEndpointSubnetBId:
+    Value: !Ref PublicEndpointSubnetB
   DatabricksSecurityGroupId:
     Value: !Ref DatabricksWorkspaceSecurityGroup
   DatabricksWorkspaceVpcEndpointId:
     Value: !Ref DatabricksWorkspaceVpcEndpoint
   DatabricksSccRelayVpcEndpointId:
     Value: !Ref DatabricksSccRelayVpcEndpoint
-  NatPublicIp:
-    Description: NAT gateway EIP. Allow-list this if Unity Catalog or workspace IP access lists require the workspace egress IP.
-    Value: !Ref NatEip
