@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: 'Customer-managed VPC for a Databricks classic workspace. Creates a
-  /25 VPC with two private /26 workspace subnets (one per AZ), two public /26
+  /25 VPC with two private /26 workspace subnets (one per AZ), two /26
   endpoint subnets (one per AZ), the required Databricks security group, and
   AWS PrivateLink interface endpoints (front-end + back-end) for private
   connectivity to Databricks. Ref:
@@ -20,7 +20,7 @@ Parameters:
   PublicEndpointCidr:
     Type: String
     Default: 10.10.2.0/24
-    Description: Secondary VPC CIDR block reserved for the two public endpoint subnets
+    Description: Secondary VPC CIDR block reserved for the two endpoint subnets
 
   WorkspaceSubnetACidr:
     Type: String
@@ -35,12 +35,12 @@ Parameters:
   PublicEndpointSubnetACidr:
     Type: String
     Default: 10.10.2.0/26
-    Description: Public endpoint subnet A for Databricks-facing VPC endpoints (STS/Kinesis)
+    Description: Endpoint subnet A for Databricks-facing VPC endpoints (STS/Kinesis)
 
   PublicEndpointSubnetBCidr:
     Type: String
     Default: 10.10.2.64/26
-    Description: Public endpoint subnet B for Databricks-facing VPC endpoints (STS/Kinesis)
+    Description: Endpoint subnet B for Databricks-facing VPC endpoints (STS/Kinesis)
 
   AvailabilityZoneA:
     Type: AWS::EC2::AvailabilityZone::Name
@@ -106,7 +106,7 @@ Resources:
         - Key: Name
           Value: !Sub ${ProjectName}-databricks-private-b
 
-  # --- Public subnets for Databricks public endpoint resources (S3/STS/Kinesis) ---
+  # --- Dedicated endpoint subnets for Databricks/AWS interface endpoints ---
   PublicEndpointSubnetA:
     Type: AWS::EC2::Subnet
     DependsOn: PublicEndpointCidrBlock
@@ -114,7 +114,7 @@ Resources:
       VpcId: !Ref Vpc
       CidrBlock: !Ref PublicEndpointSubnetACidr
       AvailabilityZone: !Ref AvailabilityZoneA
-      MapPublicIpOnLaunch: true
+      MapPublicIpOnLaunch: false
       Tags:
         - Key: Name
           Value: !Sub ${ProjectName}-databricks-public-endpoint-a
@@ -126,7 +126,7 @@ Resources:
       VpcId: !Ref Vpc
       CidrBlock: !Ref PublicEndpointSubnetBCidr
       AvailabilityZone: !Ref AvailabilityZoneB
-      MapPublicIpOnLaunch: true
+      MapPublicIpOnLaunch: false
       Tags:
         - Key: Name
           Value: !Sub ${ProjectName}-databricks-public-endpoint-b
@@ -151,7 +151,7 @@ Resources:
       SubnetId: !Ref PublicEndpointSubnetB
       RouteTableId: !Ref PublicRouteTable
 
-  # --- Private route table for the two workspace subnets (no NAT; rely on PrivateLink and public endpoint subnets) ---
+  # --- Private route table for workspace and endpoint traffic; no NAT or IGW ---
   PrivateRouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
@@ -227,6 +227,15 @@ Resources:
       ToPort: 443
       CidrIp: 0.0.0.0/0
 
+  SgEgressHttp:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupId: !Ref DatabricksWorkspaceSecurityGroup
+      IpProtocol: tcp
+      FromPort: 80
+      ToPort: 80
+      CidrIp: 0.0.0.0/0
+
   SgEgressHiveMetastore:
     Type: AWS::EC2::SecurityGroupEgress
     Properties:
@@ -234,6 +243,24 @@ Resources:
       IpProtocol: tcp
       FromPort: 3306
       ToPort: 3306
+      CidrIp: 0.0.0.0/0
+
+  SgEgressSqlServer:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupId: !Ref DatabricksWorkspaceSecurityGroup
+      IpProtocol: tcp
+      FromPort: 1433
+      ToPort: 1433
+      CidrIp: 0.0.0.0/0
+
+  SgEgressLakebase:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupId: !Ref DatabricksWorkspaceSecurityGroup
+      IpProtocol: tcp
+      FromPort: 5432
+      ToPort: 5432
       CidrIp: 0.0.0.0/0
 
   SgEgressDns:
