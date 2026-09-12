@@ -160,3 +160,21 @@ variable "additional_catalog_bucket_name" {
   description = "Globally unique S3 bucket name for the additional catalog. Defaults to {resource_prefix}-data-{workspace_id}"
   default     = null
 }
+
+variable "sql_warehouse_name" {
+  type        = string
+  default     = "Starter Warehouse"
+  description = "SQL warehouse name. Set to Starter Warehouse to manage the workspace default warehouse."
+}
+
+variable "sql_warehouse_cluster_size" {
+  type        = string
+  default     = "2X-Small"
+  description = "Starter SQL warehouse size. Databricks values: 2X-Small, X-Small, Small, Medium, Large, X-Large, 2X-Large, 3X-Large, 4X-Large."
+}
+
+variable "sql_warehouse_auto_stop_mins" {
+  type        = number
+  default     = 10
+  description = "Minutes of inactivity before the starter SQL warehouse stops."
+}

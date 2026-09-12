@@ -252,6 +252,21 @@ module "cluster_configuration" {
   depends_on = [module.databricks_mws_workspace]
 }
 
+# Starter SQL warehouse (serverless PRO). Size is set from tfvars (default 2X-Small).
+module "starter_sql_warehouse" {
+  source = "./databricks_workspace/sql_warehouse"
+  providers = {
+    databricks = databricks.created_workspace
+  }
+
+  resource_prefix               = var.resource_prefix
+  sql_warehouse_name            = var.sql_warehouse_name
+  sql_warehouse_cluster_size    = var.sql_warehouse_cluster_size
+  sql_warehouse_auto_stop_mins  = var.sql_warehouse_auto_stop_mins
+
+  depends_on = [time_sleep.wait_for_workspace]
+}
+
 # =============================================================================
 # Security Analysis Tool  - review the documentation for more information on the configuration as network egress is required for certain SAT functionality and features.
 # https://databricks-industry-solutions.github.io/security-analysis-tool/
