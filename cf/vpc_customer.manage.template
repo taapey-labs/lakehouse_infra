@@ -6,9 +6,7 @@ Description: >-
   interface endpoints) so the IDs can be passed into SRA as custom_vpc_id,
   custom_private_subnet_ids, custom_sg_id, custom_general_access_vpce_id, and
   custom_scc_relay_vpce_id.
-  SCC private DNS is left off; a Route 53 zone pins
-  tunnel.privatelink.cloud.databricks.com to the SCC endpoint so it does not
-  collide with REST ncalifornia.privatelink.cloud.databricks.com.
+  Private DNS is enabled for both Databricks PrivateLink endpoints.
   Refs:
   https://databricks.github.io/terraform-databricks-sra/docs/usage/AWS/gettingstarted/
   https://docs.databricks.com/aws/en/security/network/classic/customer-managed-vpc
@@ -139,7 +137,7 @@ Resources:
       EnableDnsHostnames: true
       Tags:
         - Key: Name
-          Value: !Sub ${ProjectName}-classic-compute-plane-vpc
+          Value: !Sub ${ProjectName}-compute-plane-vpc
         - Key: Project
           Value: !Ref ProjectName
 
@@ -288,6 +286,11 @@ Resources:
           CidrIp: !Ref VpcCidr
           Description: DNS UDP
         - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: !Ref VpcCidr
+          Description: HTTP
+        - IpProtocol: tcp
           FromPort: 443
           ToPort: 443
           DestinationPrefixListId: !If
@@ -356,6 +359,11 @@ Resources:
           SourceSecurityGroupId: !Ref DatabricksWorkspaceSecurityGroup
           Description: REST / STS / Kinesis / EC2
         - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId: !Ref DatabricksWorkspaceSecurityGroup
+          Description: HTTP
+        - IpProtocol: tcp
           FromPort: 6666
           ToPort: 6666
           SourceSecurityGroupId: !Ref DatabricksWorkspaceSecurityGroup
@@ -372,16 +380,6 @@ Resources:
           Description: Lakebase
         - IpProtocol: tcp
           FromPort: 8443
-          ToPort: 8443
-          SourceSecurityGroupId: !Ref DatabricksWorkspaceSecurityGroup
-          Description: Control plane API
-        - IpProtocol: tcp
-          FromPort: 8444
-          ToPort: 8444
-          SourceSecurityGroupId: !Ref DatabricksWorkspaceSecurityGroup
-          Description: UC logging and lineage
-        - IpProtocol: tcp
-          FromPort: 8445
           ToPort: 8451
           SourceSecurityGroupId: !Ref DatabricksWorkspaceSecurityGroup
           Description: Future extendability
@@ -478,7 +476,7 @@ Resources:
       VpcId: !Ref Vpc
       ServiceName: !Ref DatabricksSccRelayVpceServiceName
       VpcEndpointType: Interface
-      PrivateDnsEnabled: false
+      PrivateDnsEnabled: true
       SubnetIds:
         - !Ref PrivateLinkSubnetA
         - !Ref PrivateLinkSubnetB
@@ -489,45 +487,6 @@ Resources:
           Value: !Sub ${ProjectName}-databricks-dataplane-relay
         - Key: Project
           Value: !Ref ProjectName
-
-  SccRelayPrivateHostedZone:
-    Type: AWS::Route53::HostedZone
-    DependsOn: DatabricksSccRelayVpcEndpoint
-    Properties:
-      Name: tunnel.privatelink.cloud.databricks.com
-      VPCs:
-        - VPCId: !Ref Vpc
-          VPCRegion: !Ref AWS::Region
-      HostedZoneConfig:
-        Comment: Pin Databricks SCC relay PrivateLink to the relay VPC endpoint
-      HostedZoneTags:
-        - Key: Name
-          Value: !Sub ${ProjectName}-scc-tunnel-zone
-        - Key: Project
-          Value: !Ref ProjectName
-
-  SccRelayTunnelRecord:
-    Type: AWS::Route53::RecordSet
-    Properties:
-      HostedZoneId: !Ref SccRelayPrivateHostedZone
-      Name: tunnel.privatelink.cloud.databricks.com
-      Type: A
-      AliasTarget:
-        HostedZoneId: !Select
-          - 0
-          - !Split
-            - ':'
-            - !Select
-              - 0
-              - !GetAtt DatabricksSccRelayVpcEndpoint.DnsEntries
-        DNSName: !Select
-          - 1
-          - !Split
-            - ':'
-            - !Select
-              - 0
-              - !GetAtt DatabricksSccRelayVpcEndpoint.DnsEntries
-        EvaluateTargetHealth: false
 
 Outputs:
   VpcId:

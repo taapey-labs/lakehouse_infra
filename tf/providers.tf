@@ -18,7 +18,7 @@ provider "aws" {
 
 provider "databricks" {
   alias         = "workspace"
-  host          = module.databricks_sra.workspace_host
+  host          = var.account_console
   client_id     = var.databricks_client_id
   client_secret = var.databricks_client_secret
 }

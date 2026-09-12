@@ -3,6 +3,22 @@ variable "aws_region" {
   default = "us-west-1"
 }
 
+variable "network_configuration" {
+  type        = string
+  description = "Network configuration mode for the SRA module (e.g., 'custom')"
+}
+
+variable "account_console" {
+  type        = string
+  description = "URL for the AWS account console"
+  default     = "https://accounts.cloud.databricks.com"
+}
+
+
+variable "compute_mode" {
+  type        = string
+  description = "Compute mode for the SRA module (e.g., 'HYBRID')"
+}
 variable "vpc_cidr" {
   type        = string
   default     = "10.10.0.0/18"
