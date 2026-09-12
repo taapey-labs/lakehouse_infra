@@ -1,15 +1,15 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >-
   Customer-managed VPC for Databricks SRA custom network (HYBRID compute).
-  Mirrors SRA isolated networking (no IGW, no NAT, private compute subnets,
-  dedicated PrivateLink subnets, S3/STS/Kinesis/EC2 plus Databricks REST and SCC
-  interface endpoints) so the IDs can be passed into SRA as custom_vpc_id,
-  custom_private_subnet_ids, custom_sg_id, custom_general_access_vpce_id, and
-  custom_scc_relay_vpce_id.
+  Public/private topology: two private workspace subnets, two public subnets,
+  Internet Gateway, and a single NAT Gateway so classic clusters can reach
+  the Databricks control plane and AWS APIs on 0.0.0.0/0. Dedicated PrivateLink
+  subnets still host S3/STS/Kinesis/EC2 plus Databricks REST and SCC endpoints
+  (IDs passed into SRA as custom_*). Workspace SG egress allows Databricks ports
+  to the internet (via NAT), not only the VPC CIDR.
   REST PrivateLink keeps AWS private DNS. SCC PrivateLink does not: the REST
   zone (ncalifornia.privatelink.cloud.databricks.com in us-west-1) can answer
-  tunnel.privatelink and send ngrok to the REST NLB (TCP 2443/6666 refused,
-  classic cluster BOOTSTRAP_TIMEOUT). A Route 53 alias pins
+  tunnel.privatelink and send ngrok to the REST NLB. A Route 53 alias pins
   tunnel.privatelink.cloud.databricks.com to the SCC endpoint.
   Refs:
   https://databricks.github.io/terraform-databricks-sra/docs/usage/AWS/gettingstarted/
@@ -23,11 +23,13 @@ Metadata:
         Parameters:
           - ProjectName
       - Label:
-          default: VPC and subnets (SRA isolated-style CIDRs, two AZs)
+          default: VPC and subnets (two AZs, public + private)
         Parameters:
           - VpcCidr
           - WorkspaceSubnetACidr
           - WorkspaceSubnetBCidr
+          - PublicSubnetACidr
+          - PublicSubnetBCidr
           - PrivateLinkSubnetACidr
           - PrivateLinkSubnetBCidr
           - AvailabilityZoneA
@@ -75,8 +77,8 @@ Parameters:
     Type: String
     Default: 10.10.0.0/18
     Description: >-
-      VPC CIDR. Default matches a two-AZ SRA isolated layout. All workspace and
-      PrivateLink subnets must fall inside this block (no secondary CIDR).
+      VPC CIDR. All workspace, public, and PrivateLink subnets must fall inside
+      this block (no secondary CIDR).
 
   WorkspaceSubnetACidr:
     Type: String
@@ -87,6 +89,16 @@ Parameters:
     Type: String
     Default: 10.10.4.0/22
     Description: Classic compute (workspace) subnet B in a second AZ.
+
+  PublicSubnetACidr:
+    Type: String
+    Default: 10.10.8.0/24
+    Description: Public subnet A for the NAT Gateway (IGW route). Not a Databricks workspace subnet.
+
+  PublicSubnetBCidr:
+    Type: String
+    Default: 10.10.9.0/24
+    Description: Public subnet B (second AZ). Databricks does not place clusters here.
 
   PrivateLinkSubnetACidr:
     Type: String
@@ -171,6 +183,32 @@ Resources:
         - Key: Project
           Value: !Ref ProjectName
 
+  PublicSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Ref PublicSubnetACidr
+      AvailabilityZone: !Ref AvailabilityZoneA
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-public-${AvailabilityZoneA}
+        - Key: Project
+          Value: !Ref ProjectName
+
+  PublicSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Ref PublicSubnetBCidr
+      AvailabilityZone: !Ref AvailabilityZoneB
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-public-${AvailabilityZoneB}
+        - Key: Project
+          Value: !Ref ProjectName
+
   PrivateLinkSubnetA:
     Type: AWS::EC2::Subnet
     Properties:
@@ -197,6 +235,21 @@ Resources:
         - Key: Project
           Value: !Ref ProjectName
 
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-igw
+        - Key: Project
+          Value: !Ref ProjectName
+
+  VpcGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref Vpc
+      InternetGatewayId: !Ref InternetGateway
+
   PrivateRouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
@@ -206,6 +259,55 @@ Resources:
           Value: !Sub ${ProjectName}-private-rt
         - Key: Project
           Value: !Ref ProjectName
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-public-rt
+        - Key: Project
+          Value: !Ref ProjectName
+
+  PublicDefaultRoute:
+    Type: AWS::EC2::Route
+    DependsOn: VpcGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  NatEip:
+    Type: AWS::EC2::EIP
+    DependsOn: VpcGatewayAttachment
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-nat-eip
+        - Key: Project
+          Value: !Ref ProjectName
+
+  NatGateway:
+    Type: AWS::EC2::NatGateway
+    DependsOn: VpcGatewayAttachment
+    Properties:
+      AllocationId: !GetAtt NatEip.AllocationId
+      ConnectivityType: public
+      SubnetId: !Ref PublicSubnetA
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-nat
+        - Key: Project
+          Value: !Ref ProjectName
+
+  PrivateDefaultRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway
 
   PrivateLinkRouteTable:
     Type: AWS::EC2::RouteTable
@@ -229,6 +331,18 @@ Resources:
       SubnetId: !Ref WorkspaceSubnetB
       RouteTableId: !Ref PrivateRouteTable
 
+  PublicSubnetARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetA
+      RouteTableId: !Ref PublicRouteTable
+
+  PublicSubnetBRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetB
+      RouteTableId: !Ref PublicRouteTable
+
   PrivateLinkSubnetARouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
@@ -246,7 +360,7 @@ Resources:
   DatabricksWorkspaceSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Databricks workspace SG (SRA isolated-style, custom VPC)
+      GroupDescription: Databricks workspace SG (private subnets, NAT egress)
       VpcId: !Ref Vpc
       Tags:
         - Key: Name
@@ -257,13 +371,13 @@ Resources:
         - IpProtocol: tcp
           FromPort: 443
           ToPort: 443
-          CidrIp: !Ref VpcCidr
-          Description: HTTPS to PrivateLink ENIs
+          CidrIp: 0.0.0.0/0
+          Description: HTTPS via NAT or PrivateLink
         - IpProtocol: tcp
           FromPort: 2443
           ToPort: 2443
-          CidrIp: !Ref VpcCidr
-          Description: SCC FIPS / ngrok
+          CidrIp: 0.0.0.0/0
+          Description: SCC FIPS / ngrok via NAT or PrivateLink
         - IpProtocol: tcp
           FromPort: 5432
           ToPort: 5432
@@ -272,12 +386,12 @@ Resources:
         - IpProtocol: tcp
           FromPort: 6666
           ToPort: 6666
-          CidrIp: !Ref VpcCidr
-          Description: SCC relay
+          CidrIp: 0.0.0.0/0
+          Description: SCC relay via NAT or PrivateLink
         - IpProtocol: tcp
           FromPort: 8443
           ToPort: 8451
-          CidrIp: !Ref VpcCidr
+          CidrIp: 0.0.0.0/0
           Description: Control plane API / UC logging / future
         - IpProtocol: tcp
           FromPort: 53
@@ -292,8 +406,8 @@ Resources:
         - IpProtocol: tcp
           FromPort: 80
           ToPort: 80
-          CidrIp: !Ref VpcCidr
-          Description: HTTP
+          CidrIp: 0.0.0.0/0
+          Description: HTTP via NAT
         - IpProtocol: tcp
           FromPort: 443
           ToPort: 443
@@ -537,6 +651,16 @@ Outputs:
   WorkspaceSubnetBId:
     Description: Second custom_private_subnet_ids value
     Value: !Ref WorkspaceSubnetB
+  PublicSubnetAId:
+    Description: Public subnet A (NAT Gateway). Not a Databricks workspace subnet
+    Value: !Ref PublicSubnetA
+  PublicSubnetBId:
+    Description: Public subnet B. Not a Databricks workspace subnet
+    Value: !Ref PublicSubnetB
+  InternetGatewayId:
+    Value: !Ref InternetGateway
+  NatGatewayId:
+    Value: !Ref NatGateway
   PrivateLinkSubnetAId:
     Description: PrivateLink subnet A (not a workspace subnet)
     Value: !Ref PrivateLinkSubnetA
