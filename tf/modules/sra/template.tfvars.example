@@ -165,3 +165,7 @@ serverless_private_endpoint_rules = []
 sql_warehouse_name           = "Starter Warehouse"
 sql_warehouse_cluster_size   = "2X-Small"
 sql_warehouse_auto_stop_mins = 10
+
+# Dedicated Unity Catalog metastore S3 bucket (not workspace root, not catalog).
+# Defaults to {resource_prefix}-metastore
+# metastore_bucket_name = ""

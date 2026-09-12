@@ -16,3 +16,8 @@ output "starter_sql_warehouse_name" {
   description = "Name of the starter SQL warehouse."
   value       = module.starter_sql_warehouse.name
 }
+
+output "metastore_bucket_id" {
+  description = "S3 bucket used only for Unity Catalog metastore storage."
+  value       = module.unity_catalog_metastore_creation.metastore_bucket_id
+}

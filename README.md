@@ -104,6 +104,16 @@ terraform -chdir=tf import \
   <warehouse-id>
 ```
 
+## Metastore S3 bucket
+
+HYBRID mode creates a dedicated S3 bucket for Unity Catalog metastore storage only (`{resource_prefix}-metastore` by default). It is not the workspace root bucket or a catalog bucket.
+
+```hcl
+metastore_bucket_name = "my-prefix-metastore" # optional override
+```
+
+If `metastore_exists = false`, the new metastore uses this bucket as `storage_root`. If the metastore already exists, its storage root cannot be changed; the bucket and IAM role are still created.
+
 ## Classic cluster NPIP / ngrok timeout (`tunnel.privatelink.cloud.databricks.com:2443`)
 
 Classic compute over PrivateLink opens an SCC (ngrok) tunnel to the relay VPC endpoint (TCP **2443** FIPS and **6666**). After the stack is current, restart the classic cluster. From a workspace subnet:
