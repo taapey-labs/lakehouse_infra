@@ -121,6 +121,13 @@ variable "custom_metastore_name" {
   nullable    = true
 }
 
+variable "metastore_bucket_name" {
+  description = "S3 bucket name used only for Unity Catalog metastore storage. Defaults to {resource_prefix}-metastore."
+  type        = string
+  default     = null
+  nullable    = true
+}
+
 variable "custom_private_subnet_ids" {
   description = "List of custom private subnet IDs"
   type        = list(string)

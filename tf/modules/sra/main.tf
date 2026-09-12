@@ -7,11 +7,20 @@ module "unity_catalog_metastore_creation" {
   source = "./databricks_account/unity_catalog_metastore_creation"
   providers = {
     databricks = databricks.mws
+    aws        = aws
   }
 
-  region                = var.region
-  metastore_exists      = var.metastore_exists
-  custom_metastore_name = var.custom_metastore_name
+  region                 = var.region
+  metastore_exists       = var.metastore_exists
+  custom_metastore_name  = var.custom_metastore_name
+  is_serverless          = local.is_serverless
+  resource_prefix        = var.resource_prefix
+  aws_account_id         = var.aws_account_id
+  databricks_account_id  = var.databricks_account_id
+  aws_iam_partition      = local.computed_aws_partition
+  aws_assume_partition   = local.assume_role_partition
+  unity_catalog_iam_arn  = local.unity_catalog_iam_arn
+  metastore_bucket_name  = var.metastore_bucket_name
 }
 
 # Create Network Connectivity Connection Object

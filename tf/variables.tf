@@ -65,6 +65,12 @@ variable "metastore_exists" {
   description = "Whether a Unity Catalog metastore already exists for this region"
 }
 
+variable "metastore_bucket_name" {
+  type        = string
+  default     = null
+  description = "S3 bucket used only for Unity Catalog metastore storage. Defaults to {resource_prefix}-metastore"
+}
+
 variable "audit_log_delivery_exists" {
   type        = bool
   default     = true

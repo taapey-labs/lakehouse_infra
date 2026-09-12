@@ -28,4 +28,6 @@ module "aws_databricks_sra" {
   sql_warehouse_name           = var.sql_warehouse_name
   sql_warehouse_cluster_size   = var.sql_warehouse_cluster_size
   sql_warehouse_auto_stop_mins = var.sql_warehouse_auto_stop_mins
+
+  metastore_bucket_name = var.metastore_bucket_name
 }
