@@ -11,7 +11,7 @@ See [SRA AWS getting started](https://databricks.github.io/terraform-databricks-
 - `cf/vpc_customer.manage.template` - Customer VPC, PrivateLink, workspace SG
 - `tf/main.tf` - SRA module
 - `tf/variables.tf` - Inputs, including CloudFormation stack outputs
-- `tf/outputs.tf` - Workspace URL and catalog name
+- `tf/outputs.tf` - Workspace URL, catalog, metastore bucket, raw ingest bucket/role
 - `tf/backend.tf` - S3/DynamoDB state
 
 ## 1. CloudFormation customer VPC (isolated-style, custom IDs)
@@ -113,6 +113,21 @@ metastore_bucket_name = "my-prefix-metastore" # optional override
 ```
 
 If `metastore_exists = false`, the new metastore uses this bucket as `storage_root`. If the metastore already exists, its storage root cannot be changed; the bucket and IAM role are still created.
+
+## Raw ingest S3 bucket and IAM role
+
+HYBRID mode creates a landing bucket for files written **outside** Databricks (`{resource_prefix}-raw-ingest` by default) and IAM role `{resource_prefix}-raw-ingest`. Unity Catalog gets a storage credential and OPEN external location on `s3://<bucket>/`.
+
+External producers should assume the ingest role (preferred) or be listed so they can `PutObject` directly. Pass their IAM role/user/account ARNs:
+
+```hcl
+raw_ingest_bucket_name            = "my-prefix-raw-ingest" # optional override
+raw_ingest_trusted_principal_arns = [
+  "arn:aws:iam::123456789012:role/producer-role",
+]
+```
+
+If `raw_ingest_trusted_principal_arns` is empty, only Databricks Unity Catalog can use the role until those ARNs are added. Outputs: `raw_ingest_bucket`, `raw_ingest_role_arn`, `raw_ingest_external_location`.
 
 ## Classic cluster NPIP / ngrok timeout (`tunnel.privatelink.cloud.databricks.com:2443`)
 

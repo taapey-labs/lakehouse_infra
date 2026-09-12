@@ -71,6 +71,18 @@ variable "metastore_bucket_name" {
   description = "S3 bucket used only for Unity Catalog metastore storage. Defaults to {resource_prefix}-metastore"
 }
 
+variable "raw_ingest_bucket_name" {
+  type        = string
+  default     = null
+  description = "S3 bucket for raw files landed from outside Databricks. Defaults to {resource_prefix}-raw-ingest"
+}
+
+variable "raw_ingest_trusted_principal_arns" {
+  type        = list(string)
+  default     = []
+  description = "AWS principal ARNs (roles, users, or accounts) that may assume the raw-ingest role and write to the landing bucket"
+}
+
 variable "audit_log_delivery_exists" {
   type        = bool
   default     = true

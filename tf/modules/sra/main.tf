@@ -276,6 +276,28 @@ module "starter_sql_warehouse" {
   depends_on = [time_sleep.wait_for_workspace]
 }
 
+# Raw landing bucket + IAM role for data shared from outside Databricks.
+module "raw_ingest" {
+  count  = local.is_serverless ? 0 : 1
+  source = "./databricks_workspace/raw_ingest"
+  providers = {
+    databricks = databricks.created_workspace
+    aws        = aws
+  }
+
+  resource_prefix                   = var.resource_prefix
+  aws_account_id                    = var.aws_account_id
+  databricks_account_id             = var.databricks_account_id
+  aws_iam_partition                 = local.computed_aws_partition
+  aws_assume_partition              = local.assume_role_partition
+  unity_catalog_iam_arn             = local.unity_catalog_iam_arn
+  admin_user                        = var.admin_user
+  raw_ingest_bucket_name            = var.raw_ingest_bucket_name
+  raw_ingest_trusted_principal_arns = var.raw_ingest_trusted_principal_arns
+
+  depends_on = [module.unity_catalog_metastore_assignment, time_sleep.wait_for_workspace]
+}
+
 # =============================================================================
 # Security Analysis Tool  - review the documentation for more information on the configuration as network egress is required for certain SAT functionality and features.
 # https://databricks-industry-solutions.github.io/security-analysis-tool/
