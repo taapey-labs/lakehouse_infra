@@ -22,37 +22,8 @@ variable "is_serverless" {
 }
 
 variable "resource_prefix" {
-  description = "Prefix for the metastore bucket and IAM role names."
+  description = "Prefix for the metastore bucket name."
   type        = string
-}
-
-variable "aws_account_id" {
-  description = "AWS account ID for the metastore IAM role. Not required when is_serverless is true."
-  type        = string
-  default     = null
-}
-
-variable "databricks_account_id" {
-  description = "Databricks account ID used in the metastore bucket policy."
-  type        = string
-}
-
-variable "aws_iam_partition" {
-  type        = string
-  description = "AWS partition for IAM ARNs."
-  default     = "aws"
-}
-
-variable "aws_assume_partition" {
-  type        = string
-  description = "AWS partition for Unity Catalog assume-role policies."
-  default     = "aws"
-}
-
-variable "unity_catalog_iam_arn" {
-  type        = string
-  description = "Unity Catalog IAM ARN for the master role."
-  default     = "arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL"
 }
 
 variable "metastore_bucket_name" {

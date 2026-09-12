@@ -13,6 +13,11 @@ output "metastore_bucket" {
   value       = module.aws_databricks_sra.metastore_bucket_id
 }
 
+output "metastore_role_arn" {
+  description = "IAM role ARN for the Unity Catalog metastore storage credential."
+  value       = module.aws_databricks_sra.metastore_role_arn
+}
+
 output "starter_sql_warehouse_id" {
   description = "ID of the starter SQL warehouse."
   value       = module.aws_databricks_sra.starter_sql_warehouse_id

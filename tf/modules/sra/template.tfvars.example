@@ -167,7 +167,8 @@ sql_warehouse_cluster_size   = "2X-Small"
 sql_warehouse_auto_stop_mins = 10
 
 # Dedicated Unity Catalog metastore S3 bucket (not workspace root, not catalog).
-# Defaults to {resource_prefix}-metastore
+# Defaults to {resource_prefix}-metastore. The storage credential is created on
+# the workspace API after metastore assignment (account API is not available).
 # metastore_bucket_name = ""
 
 # Raw ingest landing bucket + IAM role for data shared from outside Databricks.
