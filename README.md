@@ -12,7 +12,7 @@ See [SRA AWS getting started](https://databricks.github.io/terraform-databricks-
 - `tf/main.tf` - SRA module
 - `tf/variables.tf` - Inputs, including CloudFormation stack outputs
 - `tf/outputs.tf` - Workspace URL, catalog, metastore bucket, raw ingest bucket/role
-- `tf/backend.tf` - S3/DynamoDB state
+- `tf/backend.tf` - S3 state with native lockfile (`use_lockfile`)
 
 ## 1. CloudFormation customer VPC (public/private + NAT)
 
