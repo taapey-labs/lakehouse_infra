@@ -7,3 +7,8 @@ output "catalog_name" {
   description = "Name of the Unity Catalog catalog created for the workspace."
   value       = module.aws_databricks_sra.catalog_name
 }
+
+output "starter_sql_warehouse_id" {
+  description = "ID of the starter SQL warehouse."
+  value       = module.aws_databricks_sra.starter_sql_warehouse_id
+}

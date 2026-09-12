@@ -86,6 +86,24 @@ This Databricks account does not support `ingress.cross_workspace_access` on acc
 
 `audit_log_delivery_exists` defaults to `true` so SRA does not recreate `{prefix}-audit-log-delivery-credential` when that MWS credential already exists. Set it to `false` only for a brand-new account that has never had audit log delivery configured.
 
+## Starter SQL warehouse
+
+Terraform manages the workspace **Starter Warehouse** as a serverless PRO SQL warehouse. Size defaults to **`2X-Small`** (instead of Small). Set it in tfvars:
+
+```hcl
+sql_warehouse_name           = "Starter Warehouse"
+sql_warehouse_cluster_size   = "2X-Small"   # or X-Small, Small, Medium, ...
+sql_warehouse_auto_stop_mins = 10
+```
+
+If the warehouse already exists, import it before apply:
+
+```bash
+terraform -chdir=tf import \
+  'module.aws_databricks_sra.module.starter_sql_warehouse.databricks_sql_endpoint.starter' \
+  <warehouse-id>
+```
+
 ## Classic cluster NPIP / ngrok timeout (`tunnel.privatelink.cloud.databricks.com:2443`)
 
 Classic compute over PrivateLink opens an SCC (ngrok) tunnel to the relay VPC endpoint (TCP **2443** FIPS and **6666**). After the stack is current, restart the classic cluster. From a workspace subnet:

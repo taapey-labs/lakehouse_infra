@@ -233,6 +233,31 @@ variable "enable_security_analysis_tool" {
   default     = false
 }
 
+variable "sql_warehouse_name" {
+  description = "Name of the workspace SQL warehouse (Databricks default is Starter Warehouse)."
+  type        = string
+  default     = "Starter Warehouse"
+}
+
+variable "sql_warehouse_cluster_size" {
+  description = "Cluster size for the starter SQL warehouse. Databricks values: 2X-Small, X-Small, Small, Medium, Large, X-Large, 2X-Large, 3X-Large, 4X-Large."
+  type        = string
+  default     = "2X-Small"
+
+  validation {
+    condition = contains([
+      "2X-Small", "X-Small", "Small", "Medium", "Large", "X-Large", "2X-Large", "3X-Large", "4X-Large"
+    ], var.sql_warehouse_cluster_size)
+    error_message = "sql_warehouse_cluster_size must be a Databricks SQL warehouse size (for example 2X-Small)."
+  }
+}
+
+variable "sql_warehouse_auto_stop_mins" {
+  description = "Minutes of inactivity before the starter SQL warehouse stops."
+  type        = number
+  default     = 10
+}
+
 # General Access (Workspace API) PrivateLink Endpoint configuration
 # This variable allows mapping regions to multiple endpoint properties:
 # - primary_endpoint: The main endpoint service name (required)
