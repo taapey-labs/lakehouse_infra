@@ -1,8 +1,8 @@
 # lakehouse_infra
 
-Terraform wrapper around pinned Databricks SRA (`compute_mode = HYBRID`, `network_configuration = custom`) plus a CloudFormation customer VPC that mirrors SRA **isolated** networking.
+Terraform wrapper around pinned Databricks SRA (`compute_mode = HYBRID`, `network_configuration = custom`) plus a CloudFormation customer VPC with **public/private subnets, an Internet Gateway, and a NAT Gateway** so classic clusters can initialize over the internet.
 
-SRA custom mode does not create a VPC. Isolated-style networking is defined in `cf/vpc_customer.manage.template`, then IDs are passed into Terraform as `custom_*` variables.
+SRA custom mode does not create a VPC. Networking is defined in `cf/vpc_customer.manage.template`, then IDs are passed into Terraform as `custom_*` variables.
 
 See [SRA AWS getting started](https://databricks.github.io/terraform-databricks-sra/docs/usage/AWS/gettingstarted/) (use the **custom** variables, not isolated CIDR variables, in Terraform).
 
@@ -14,27 +14,31 @@ See [SRA AWS getting started](https://databricks.github.io/terraform-databricks-
 - `tf/outputs.tf` - Workspace URL, catalog, metastore bucket, raw ingest bucket/role
 - `tf/backend.tf` - S3/DynamoDB state
 
-## 1. CloudFormation customer VPC (isolated-style, custom IDs)
+## 1. CloudFormation customer VPC (public/private + NAT)
 
-The template matches SRA isolated (`aws/tf/network.tf` and `privatelink.tf`) for a **two-AZ** region such as `us-west-1`:
+The template is a two-AZ playground VPC (`us-west-1`): Databricks classic compute stays in **private** subnets; NAT lives in a **public** subnet.
 
-| Isolated SRA | This template |
+| Piece | This template |
 | --- | --- |
-| No IGW, no NAT | Same |
-| Private compute subnets | `WorkspaceSubnetA/B` (`/22`) |
+| Internet Gateway | Attached to the VPC |
+| Public subnets | `PublicSubnetA/B` (`/24`), IGW route |
+| NAT Gateway | Single public NAT in `PublicSubnetA` (Elastic IP) |
+| Private compute subnets | `WorkspaceSubnetA/B` (`/22`), default route `0.0.0.0/0` → NAT |
 | Intra / PrivateLink subnets | `PrivateLinkSubnetA/B` (`/26`) — **not** workspace subnets |
 | S3 gateway + STS + Kinesis + EC2 | STS, Kinesis, and EC2 on PrivateLink subnets |
-| Databricks REST + SCC VPCEs | Same, on PrivateLink subnets |
-| Workspace SG egress to VPC CIDR + S3 prefix list | Same (plus DNS 53) |
-| PrivateLink SG 443/2443/5432/6666/8443–8451 | Same |
+| Databricks REST + SCC VPCEs | Same, on PrivateLink subnets (existing SRA custom IDs) |
+| Workspace SG | Databricks ports (443, 2443, 6666, 8443–8451, 80) to `0.0.0.0/0` plus S3 prefix list |
+| PrivateLink SG 443/2443/5432/6666/8443–8451 | Ingress from workspace SG |
 
-Differences from stock isolated SRA (required for classic NPIP):
+PrivateLink is kept so the current workspace registration does not break. NAT plus internet SG egress is the path for control-plane and AWS API traffic that is not pinned to a VPC endpoint.
+
+Also:
 
 - REST VPCE keeps AWS private DNS (`ncalifornia.privatelink.cloud.databricks.com`)
 - SCC VPCE private DNS is **off**
 - Route 53 aliases `tunnel.privatelink.cloud.databricks.com` to the SCC endpoint
 
-Defaults are `10.10.0.0/18` with us-west-1 PrivateLink service names. Changing CIDRs on an existing stack replaces the VPC/subnets/VPCEs; pass the current CIDRs to update in place, or create a new stack.
+Defaults are `10.10.0.0/18` with us-west-1 PrivateLink service names. Changing **existing** CIDRs on a stack replaces those subnets; adding the public CIDRs `10.10.8.0/24` and `10.10.9.0/24` is an in-place update if those blocks are free.
 
 Deploy (example):
 
@@ -65,6 +69,8 @@ Pass only CloudFormation AWS `vpce-` IDs. Do **not** pass Databricks account-con
 The vendored SRA workspace module attaches `databricks_mws_vpc_endpoint.general_access` to `dataplane_relay` and `scc_tunnel_dataplane_relay_access` to `rest_api`. That matches Databricks use_case on this account (SCC AWS VPCE registered as DATAPLANE_RELAY_ACCESS, REST as WORKSPACE_ACCESS). Keep tfvars as they are; do not swap the two AWS IDs to “fix” the rest_api error.
 
 After a stack update that replaces VPCEs, pass the new AWS endpoint IDs into Terraform.
+
+After this NAT/IGW stack update, **restart the classic cluster**. Terraform does not need to change unless subnet or VPCE IDs were replaced. Do **not** put public subnet IDs in `custom_private_subnet_ids`.
 
 ## 2. Terraform SRA workspace
 
