@@ -17,3 +17,23 @@ output "starter_sql_warehouse_id" {
   description = "ID of the starter SQL warehouse."
   value       = module.aws_databricks_sra.starter_sql_warehouse_id
 }
+
+output "raw_ingest_bucket" {
+  description = "S3 bucket for raw data landed from outside Databricks."
+  value       = module.aws_databricks_sra.raw_ingest_bucket_id
+}
+
+output "raw_ingest_role_arn" {
+  description = "IAM role ARN for external writers and Databricks ingest of the raw landing bucket."
+  value       = module.aws_databricks_sra.raw_ingest_role_arn
+}
+
+output "raw_ingest_storage_credential" {
+  description = "Unity Catalog storage credential for the raw ingest bucket."
+  value       = module.aws_databricks_sra.raw_ingest_storage_credential_name
+}
+
+output "raw_ingest_external_location" {
+  description = "Unity Catalog external location name for the raw ingest bucket."
+  value       = module.aws_databricks_sra.raw_ingest_external_location_name
+}

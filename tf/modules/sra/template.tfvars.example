@@ -169,3 +169,11 @@ sql_warehouse_auto_stop_mins = 10
 # Dedicated Unity Catalog metastore S3 bucket (not workspace root, not catalog).
 # Defaults to {resource_prefix}-metastore
 # metastore_bucket_name = ""
+
+# Raw ingest landing bucket + IAM role for data shared from outside Databricks.
+# Defaults to {resource_prefix}-raw-ingest. List producer IAM ARNs so they can
+# assume the ingest role and/or PutObject into the bucket.
+# raw_ingest_bucket_name = ""
+# raw_ingest_trusted_principal_arns = [
+#   "arn:aws:iam::123456789012:role/producer-role",
+# ]

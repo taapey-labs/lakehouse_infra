@@ -30,4 +30,7 @@ module "aws_databricks_sra" {
   sql_warehouse_auto_stop_mins = var.sql_warehouse_auto_stop_mins
 
   metastore_bucket_name = var.metastore_bucket_name
+
+  raw_ingest_bucket_name            = var.raw_ingest_bucket_name
+  raw_ingest_trusted_principal_arns = var.raw_ingest_trusted_principal_arns
 }

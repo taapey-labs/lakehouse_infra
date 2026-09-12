@@ -128,6 +128,19 @@ variable "metastore_bucket_name" {
   nullable    = true
 }
 
+variable "raw_ingest_bucket_name" {
+  description = "S3 bucket for raw files landed from outside Databricks. Defaults to {resource_prefix}-raw-ingest."
+  type        = string
+  default     = null
+  nullable    = true
+}
+
+variable "raw_ingest_trusted_principal_arns" {
+  description = "AWS principal ARNs that may assume the raw-ingest IAM role and write objects to the landing bucket."
+  type        = list(string)
+  default     = []
+}
+
 variable "custom_private_subnet_ids" {
   description = "List of custom private subnet IDs"
   type        = list(string)
