@@ -87,9 +87,14 @@ resource "databricks_mws_networks" "this" {
   security_group_ids = var.security_group_ids
   subnet_ids         = var.subnet_ids
   vpc_id             = var.vpc_id
+  # Databricks infers MWS use_case from the AWS PrivateLink service, not from
+  # these Terraform resource names. custom_general_access_vpce_id was the SCC
+  # relay (DATAPLANE_RELAY_ACCESS) and custom_scc_relay_vpce_id was REST
+  # (WORKSPACE_ACCESS). rest_api must be WORKSPACE_ACCESS; dataplane_relay
+  # must be DATAPLANE_RELAY_ACCESS.
   vpc_endpoints {
-    dataplane_relay = [var.scc_relay_mws_vpce_id != null ? var.scc_relay_mws_vpce_id : databricks_mws_vpc_endpoint.scc_tunnel_dataplane_relay_access[0].vpc_endpoint_id]
-    rest_api        = [var.general_access_mws_vpce_id != null ? var.general_access_mws_vpce_id : databricks_mws_vpc_endpoint.general_access[0].vpc_endpoint_id]
+    dataplane_relay = [var.general_access_mws_vpce_id != null ? var.general_access_mws_vpce_id : databricks_mws_vpc_endpoint.general_access[0].vpc_endpoint_id]
+    rest_api        = [var.scc_relay_mws_vpce_id != null ? var.scc_relay_mws_vpce_id : databricks_mws_vpc_endpoint.scc_tunnel_dataplane_relay_access[0].vpc_endpoint_id]
   }
 }
 

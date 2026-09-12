@@ -19,7 +19,7 @@ module "aws_databricks_sra" {
   custom_vpc_id                 = var.custom_vpc_id
   custom_private_subnet_ids     = var.custom_private_subnet_ids
   custom_sg_id                  = var.custom_sg_id
-  sg_egress_ports = var.sg_egress_ports
+  sg_egress_ports               = var.sg_egress_ports
   custom_general_access_vpce_id = var.custom_general_access_vpce_id
   custom_scc_relay_vpce_id      = var.custom_scc_relay_vpce_id
   context_based_ingress_ip_acl                  = var.context_based_ingress_ip_acl
