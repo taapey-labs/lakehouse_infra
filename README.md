@@ -62,7 +62,7 @@ Do **not** put PrivateLink subnet IDs in `custom_private_subnet_ids`. Those are 
 
 Pass only CloudFormation AWS `vpce-` IDs. Do **not** pass Databricks account-console VPC endpoint UUIDs (MWS). SRA registers those AWS endpoints itself.
 
-If apply fails with `DATAPLANE_RELAY_ACCESS cannot be attached in rest_api list` (and `WORKSPACE_ACCESS cannot be attached in dataplane_relay list`), the two AWS VPCE IDs are reversed. Swap `custom_general_access_vpce_id` (REST / `DatabricksWorkspaceVpcEndpointId`) and `custom_scc_relay_vpce_id` (SCC / `DatabricksSccRelayVpcEndpointId`). Remove any leftover `custom_*_mws_vpce_id` from tfvars. If a previous apply already created MWS VPC endpoints with the wrong mapping, delete those account VPC endpoints before re-applying.
+The vendored SRA workspace module attaches `databricks_mws_vpc_endpoint.general_access` to `dataplane_relay` and `scc_tunnel_dataplane_relay_access` to `rest_api`. That matches Databricks use_case on this account (SCC AWS VPCE registered as DATAPLANE_RELAY_ACCESS, REST as WORKSPACE_ACCESS). Keep tfvars as they are; do not swap the two AWS IDs to “fix” the rest_api error.
 
 After a stack update that replaces VPCEs, pass the new AWS endpoint IDs into Terraform.
 
