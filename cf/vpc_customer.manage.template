@@ -6,7 +6,11 @@ Description: >-
   interface endpoints) so the IDs can be passed into SRA as custom_vpc_id,
   custom_private_subnet_ids, custom_sg_id, custom_general_access_vpce_id, and
   custom_scc_relay_vpce_id.
-  Private DNS is enabled for both Databricks PrivateLink endpoints.
+  REST PrivateLink keeps AWS private DNS. SCC PrivateLink does not: the REST
+  zone (ncalifornia.privatelink.cloud.databricks.com in us-west-1) can answer
+  tunnel.privatelink and send ngrok to the REST NLB (TCP 2443/6666 refused,
+  classic cluster BOOTSTRAP_TIMEOUT). A Route 53 alias pins
+  tunnel.privatelink.cloud.databricks.com to the SCC endpoint.
   Refs:
   https://databricks.github.io/terraform-databricks-sra/docs/usage/AWS/gettingstarted/
   https://docs.databricks.com/aws/en/security/network/classic/customer-managed-vpc
@@ -452,6 +456,9 @@ Resources:
         - Key: Project
           Value: !Ref ProjectName
 
+  # REST / General Access. Private DNS name is ncalifornia.privatelink.cloud.databricks.com
+  # (us-west-1). That zone can also answer tunnel.privatelink.cloud.databricks.com via a
+  # parent wildcard, which sends SCC traffic to the REST NLB (connection refused on 2443/6666).
   DatabricksWorkspaceVpcEndpoint:
     Type: AWS::EC2::VPCEndpoint
     Properties:
@@ -470,13 +477,15 @@ Resources:
         - Key: Project
           Value: !Ref ProjectName
 
+  # SCC relay. Do not enable AWS-managed private DNS here: it fights the REST endpoint's
+  # privatelink.cloud.databricks.com zone. Pin tunnel.* with an explicit hosted zone below.
   DatabricksSccRelayVpcEndpoint:
     Type: AWS::EC2::VPCEndpoint
     Properties:
       VpcId: !Ref Vpc
       ServiceName: !Ref DatabricksSccRelayVpceServiceName
       VpcEndpointType: Interface
-      PrivateDnsEnabled: true
+      PrivateDnsEnabled: false
       SubnetIds:
         - !Ref PrivateLinkSubnetA
         - !Ref PrivateLinkSubnetB
@@ -487,6 +496,36 @@ Resources:
           Value: !Sub ${ProjectName}-databricks-dataplane-relay
         - Key: Project
           Value: !Ref ProjectName
+
+  SccRelayPrivateHostedZone:
+    Type: AWS::Route53::HostedZone
+    DependsOn: DatabricksSccRelayVpcEndpoint
+    Properties:
+      Name: tunnel.privatelink.cloud.databricks.com
+      VPCs:
+        - VPCId: !Ref Vpc
+          VPCRegion: !Ref AWS::Region
+      HostedZoneConfig:
+        Comment: Pin Databricks SCC relay PrivateLink to the relay VPC endpoint
+      HostedZoneTags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-scc-tunnel-phz
+        - Key: Project
+          Value: !Ref ProjectName
+
+  SccRelayTunnelRecord:
+    Type: AWS::Route53::RecordSet
+    DependsOn:
+      - DatabricksSccRelayVpcEndpoint
+      - SccRelayPrivateHostedZone
+    Properties:
+      HostedZoneId: !Ref SccRelayPrivateHostedZone
+      Name: tunnel.privatelink.cloud.databricks.com
+      Type: A
+      AliasTarget:
+        HostedZoneId: !Select [0, !Split [':', !Select [0, !GetAtt DatabricksSccRelayVpcEndpoint.DnsEntries]]]
+        DNSName: !Select [1, !Split [':', !Select [0, !GetAtt DatabricksSccRelayVpcEndpoint.DnsEntries]]]
+        EvaluateTargetHealth: false
 
 Outputs:
   VpcId:
