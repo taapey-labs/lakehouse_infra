@@ -1,7 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: >-
-  S3 bucket for Terraform remote state. DynamoDB lock table is optional leftover
-  from the deprecated dynamodb_table backend; tf/backend.tf now uses use_lockfile.
+Description: 'CloudFormation template to create S3 Bucket and DynamoDB table for Terraform Remote State'
 
 Parameters:
   ProjectName:
@@ -17,10 +15,7 @@ Parameters:
   TableName:
     Type: String
     Default: stack-lakehouse-terraform-state-lock
-    Description: >-
-      Optional. Terraform no longer uses dynamodb_table locking (use_lockfile
-      instead). Keep this table if the stack already created it; it is unused
-      by current tf/backend.tf.
+    Description: Must match the dynamodb_table referenced in tf/backend.tf
 
 Resources:
   TerraformStateBucket:
