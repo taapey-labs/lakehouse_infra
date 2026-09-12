@@ -131,7 +131,9 @@ If `raw_ingest_trusted_principal_arns` is empty, only Databricks Unity Catalog c
 
 ## Classic cluster NPIP / ngrok timeout (`tunnel.privatelink.cloud.databricks.com:2443`)
 
-Classic compute over PrivateLink opens an SCC (ngrok) tunnel to the relay VPC endpoint (TCP **2443** FIPS and **6666**). After the stack is current, restart the classic cluster. From a workspace subnet:
+Classic compute over PrivateLink opens an SCC (ngrok) tunnel to `tunnel.privatelink.cloud.databricks.com` (TCP **2443** FIPS and **6666**). If that name is answered by the REST VPCE zone, the driver hits `BOOTSTRAP_TIMEOUT` / “check network connectivity from the data plane to the control plane” because 2443/6666 are refused on the REST NLB.
+
+The customer VPC template disables AWS private DNS on the SCC endpoint and aliases `tunnel.privatelink` to that endpoint in Route 53. After updating the CloudFormation stack, restart the classic cluster. From a workspace subnet:
 
 ```bash
 nslookup ncalifornia.privatelink.cloud.databricks.com   # REST VPCE ENIs
