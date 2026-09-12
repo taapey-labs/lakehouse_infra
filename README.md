@@ -118,7 +118,9 @@ HYBRID mode creates a dedicated S3 bucket for Unity Catalog metastore storage on
 metastore_bucket_name = "my-prefix-metastore" # optional override
 ```
 
-If `metastore_exists = false`, the new metastore uses this bucket as `storage_root`. If the metastore already exists, its storage root cannot be changed; the bucket and IAM role are still created.
+If `metastore_exists = false`, a new metastore is created without `storage_root` (this Databricks account cannot create storage credentials on the account API). The dedicated bucket still gets a **workspace** storage credential, IAM role, and OPEN external location after the metastore is assigned to the workspace.
+
+If the metastore already exists, its storage root cannot be changed; the bucket, workspace credential, and external location are still created.
 
 ## Raw ingest S3 bucket and IAM role
 

@@ -8,7 +8,7 @@ output "metastore_bucket_id" {
   value       = var.is_serverless ? null : aws_s3_bucket.metastore[0].id
 }
 
-output "metastore_role_arn" {
-  description = "IAM role ARN for the metastore storage credential. Empty when serverless."
-  value       = var.is_serverless ? null : aws_iam_role.metastore[0].arn
+output "metastore_bucket_arn" {
+  description = "ARN of the metastore S3 bucket. Empty when serverless."
+  value       = var.is_serverless ? null : aws_s3_bucket.metastore[0].arn
 }

@@ -22,6 +22,11 @@ output "metastore_bucket_id" {
   value       = module.unity_catalog_metastore_creation.metastore_bucket_id
 }
 
+output "metastore_role_arn" {
+  description = "IAM role ARN for the metastore storage credential. Empty when serverless."
+  value       = local.is_serverless ? null : module.metastore_storage[0].role_arn
+}
+
 output "raw_ingest_bucket_id" {
   description = "S3 bucket for raw data landed from outside Databricks."
   value       = local.is_serverless ? null : module.raw_ingest[0].bucket_id
