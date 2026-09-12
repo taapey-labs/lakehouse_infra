@@ -6,7 +6,7 @@ resource "databricks_sql_endpoint" "starter" {
   min_num_clusters          = 1
   max_num_clusters          = 1
   auto_stop_mins            = var.sql_warehouse_auto_stop_mins
-  enable_serverless_compute = true
+  enable_serverless_compute = var.sql_warehouse_enable_serverless
   warehouse_type            = "PRO"
 
   tags {

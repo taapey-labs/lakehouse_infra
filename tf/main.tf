@@ -25,9 +25,10 @@ module "aws_databricks_sra" {
   context_based_ingress_ip_acl                  = var.context_based_ingress_ip_acl
   serverless_private_endpoint_rules             = var.serverless_private_endpoint_rules
 
-  sql_warehouse_name           = var.sql_warehouse_name
-  sql_warehouse_cluster_size   = var.sql_warehouse_cluster_size
-  sql_warehouse_auto_stop_mins = var.sql_warehouse_auto_stop_mins
+  sql_warehouse_name              = var.sql_warehouse_name
+  sql_warehouse_cluster_size      = var.sql_warehouse_cluster_size
+  sql_warehouse_auto_stop_mins    = var.sql_warehouse_auto_stop_mins
+  sql_warehouse_enable_serverless = var.sql_warehouse_enable_serverless
 
   metastore_bucket_name = var.metastore_bucket_name
 

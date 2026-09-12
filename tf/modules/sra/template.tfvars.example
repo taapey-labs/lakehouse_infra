@@ -161,10 +161,11 @@ serverless_private_endpoint_rules = []
 # Optional human-readable name shown in the Databricks UI. Defaults to resource_prefix if unset.
 # workspace_display_name = ""
 
-# Starter SQL warehouse (serverless PRO). Default size is 2X-Small (was Small).
-sql_warehouse_name           = "Starter Warehouse"
-sql_warehouse_cluster_size   = "2X-Small"
-sql_warehouse_auto_stop_mins = 10
+# Starter SQL warehouse (classic Pro by default; this workspace is not serverless-eligible).
+sql_warehouse_name              = "Starter Warehouse"
+sql_warehouse_cluster_size      = "2X-Small"
+sql_warehouse_auto_stop_mins    = 10
+sql_warehouse_enable_serverless = false
 
 # Dedicated Unity Catalog metastore S3 bucket (not workspace root, not catalog).
 # Defaults to {resource_prefix}-metastore. The storage credential is created on
