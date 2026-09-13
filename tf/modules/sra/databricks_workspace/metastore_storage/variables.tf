@@ -33,7 +33,7 @@ variable "unity_catalog_iam_arn" {
 
 variable "admin_user" {
   type        = string
-  description = "Workspace admin granted ALL_PRIVILEGES on the metastore external location."
+  description = "Workspace admin granted ALL_PRIVILEGES on the metastore external location and ALL_PRIVILEGES plus MANAGE on the storage credential."
 }
 
 variable "metastore_bucket_id" {

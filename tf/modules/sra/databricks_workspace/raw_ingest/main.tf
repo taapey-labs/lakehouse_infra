@@ -218,3 +218,9 @@ resource "databricks_grant" "raw_ingest_admin" {
   principal         = var.admin_user
   privileges        = ["ALL_PRIVILEGES"]
 }
+
+resource "databricks_grant" "raw_ingest_credential_admin" {
+  storage_credential = databricks_storage_credential.raw_ingest.id
+  principal          = var.admin_user
+  privileges         = ["ALL_PRIVILEGES", "MANAGE"]
+}

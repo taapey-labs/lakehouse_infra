@@ -127,3 +127,9 @@ resource "databricks_grant" "metastore_admin" {
   principal         = var.admin_user
   privileges        = ["ALL_PRIVILEGES"]
 }
+
+resource "databricks_grant" "metastore_credential_admin" {
+  storage_credential = databricks_storage_credential.metastore.id
+  principal          = var.admin_user
+  privileges         = ["ALL_PRIVILEGES", "MANAGE"]
+}
