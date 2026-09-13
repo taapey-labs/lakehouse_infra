@@ -2,6 +2,11 @@ output "workspace_host" {
   value = module.databricks_mws_workspace.workspace_url
 }
 
+output "workspace_network_policy_id" {
+  description = "Network policy currently attached to the workspace."
+  value       = var.workspace_network_policy_id
+}
+
 output "catalog_name" {
   description = "Name of the catalog created for the workspace."
   value       = module.unity_catalog_catalog_creation.catalog_name

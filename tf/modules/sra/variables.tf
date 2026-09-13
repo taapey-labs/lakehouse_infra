@@ -102,6 +102,12 @@ variable "cross_workspace_ingress_allowed_workspace_ids" {
   default     = []
 }
 
+variable "workspace_network_policy_id" {
+  description = "Network policy attached to the workspace. Custom {prefix}-np cannot set ingress.cross_workspace_access on this account, so Unity Catalog is denied (403 KCUC4). Bind default-policy unless you have a custom policy that explicitly allows UC."
+  type        = string
+  default     = "default-policy"
+}
+
 variable "custom_general_access_mws_vpce_id" {
   description = "Pre-registered Databricks MWS VPC Endpoint ID for General Access. If set, the AWS VPC endpoint is not re-registered with Databricks; this ID is wired directly into the workspace network configuration."
   type        = string

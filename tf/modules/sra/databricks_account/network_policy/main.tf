@@ -8,10 +8,10 @@ resource "databricks_account_network_policy" "restrictive_network_policy" {
   account_id        = var.databricks_account_id
   network_policy_id = "${var.resource_prefix}-np" # Must not be more than 32 characters.
 
-  # RESTRICTED_ACCESS with an empty allow list blocks Unity Catalog backend
-  # calls into the workspace (HTTP 403 Unauthorized network access to workspace).
-  # This account cannot set ingress.cross_workspace_access, so open serverless
-  # egress instead (same as the previous {prefix}-uc-ingress-np overlay).
+  # This custom policy is kept for optional later use. Do not attach it to the
+  # workspace: this account cannot set ingress.cross_workspace_access, so the
+  # API default denies Unity Catalog with 403 Unauthorized network access
+  # (KCUC4). The workspace binds default-policy instead.
   egress = {
     network_access = {
       restriction_mode = "FULL_ACCESS"

@@ -86,7 +86,7 @@ variable "managed_services_key_alias" {
 }
 
 variable "network_policy_id" {
-  description = "Network policy ID for serverless compute."
+  description = "Network policy ID attached to the workspace (default-policy unless overridden)."
   type        = string
 }
 
