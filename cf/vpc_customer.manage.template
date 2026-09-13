@@ -7,14 +7,7 @@ Description: >-
   subnets still host S3/STS/Kinesis/EC2 plus Databricks REST and SCC endpoints
   (IDs passed into SRA as custom_*). Workspace SG egress allows Databricks ports
   to the internet (via NAT), not only the VPC CIDR.
-  REST PrivateLink keeps AWS private DNS. SCC PrivateLink does not: the REST
-  zone (ncalifornia.privatelink.cloud.databricks.com in us-west-1) can answer
-  tunnel.privatelink and send ngrok to the REST NLB. A Route 53 alias pins
-  tunnel.privatelink.cloud.databricks.com to the SCC endpoint
-  (vpce-svc-04cb91f9372b792fe). Separate private hosted zones pin the workspace
-  public and privatelink hostnames to the REST endpoint
-  (vpce-svc-09bb6ca26208063f2) so they cannot resolve to the SCC tunnel ENIs.
-  Refs:
+  REST PrivateLink keeps AWS private DNS.
   https://databricks.github.io/terraform-databricks-sra/docs/usage/AWS/gettingstarted/
   https://docs.databricks.com/aws/en/security/network/classic/customer-managed-vpc
 
