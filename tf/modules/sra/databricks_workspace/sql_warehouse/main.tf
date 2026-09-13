@@ -1,33 +1,18 @@
 # Terraform Documentation: https://registry.terraform.io/providers/databricks/databricks/latest/docs/resources/sql_endpoint
 
-data "databricks_sql_warehouses" "all" {}
-
-data "databricks_sql_warehouse" "by_id" {
-  for_each = toset(data.databricks_sql_warehouses.all.ids)
-  id       = each.value
+# Look up by name (known at plan). Do not for_each over databricks_sql_warehouses.ids;
+# that set is computed and Terraform rejects it as "known only after apply".
+data "databricks_sql_warehouse" "existing" {
+  name = var.sql_warehouse_name
 }
 
-locals {
-  existing_starter_id = try(
-    [
-      for w in data.databricks_sql_warehouse.by_id : w.id
-      if w.name == var.sql_warehouse_name
-    ][0],
-    null
-  )
-}
-
-# Adopt a warehouse that already exists in the workspace (same name) instead of creating a duplicate.
 import {
-  for_each = local.existing_starter_id != null ? { (var.sql_warehouse_name) = local.existing_starter_id } : {}
-  to       = databricks_sql_endpoint.starter[each.key]
-  id       = each.value
+  to = databricks_sql_endpoint.starter
+  id = data.databricks_sql_warehouse.existing.id
 }
 
 resource "databricks_sql_endpoint" "starter" {
-  for_each = toset([var.sql_warehouse_name])
-
-  name             = each.value
+  name             = var.sql_warehouse_name
   cluster_size     = var.sql_warehouse_cluster_size
   min_num_clusters = 1
   max_num_clusters = 1
@@ -43,6 +28,6 @@ resource "databricks_sql_endpoint" "starter" {
 }
 
 moved {
-  from = databricks_sql_endpoint.starter
-  to   = databricks_sql_endpoint.starter["Starter Warehouse"]
+  from = databricks_sql_endpoint.starter["Starter Warehouse"]
+  to   = databricks_sql_endpoint.starter
 }
