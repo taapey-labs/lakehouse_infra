@@ -34,9 +34,23 @@ PrivateLink is kept so the current workspace registration does not break. NAT pl
 
 Also:
 
-- REST VPCE keeps AWS private DNS (`ncalifornia.privatelink.cloud.databricks.com`)
-- SCC VPCE private DNS is **off**
-- Route 53 aliases `tunnel.privatelink.cloud.databricks.com` to the SCC endpoint
+- REST VPCE (`vpce-svc-09bb6ca26208063f2`) keeps AWS private DNS (`ncalifornia.privatelink.cloud.databricks.com`)
+- SCC VPCE (`vpce-svc-04cb91f9372b792fe`) private DNS is **off**
+- Route 53 aliases `tunnel.privatelink.cloud.databricks.com` to the **SCC** endpoint
+- Route 53 aliases `dbc-541c1fdc-07c5.cloud.databricks.com` and `dbc-541c1fdc-07c5.privatelink.cloud.databricks.com` to the **REST** endpoint
+
+Do **not** create a wildcard `*.cloud.databricks.com` or a parent `privatelink.cloud.databricks.com` / `cloud.databricks.com` private zone. Those overlay SCC and REST onto one VPCE: the workspace URL then hits the tunnel NLB and REST/Unity Catalog calls return 400/403.
+
+From a host in the VPC:
+
+```text
+nslookup ncalifornia.privatelink.cloud.databricks.com       # REST ENIs
+nslookup tunnel.privatelink.cloud.databricks.com            # SCC ENIs
+nslookup dbc-541c1fdc-07c5.cloud.databricks.com             # REST ENIs, not SCC
+nslookup dbc-541c1fdc-07c5.privatelink.cloud.databricks.com  # REST ENIs, not SCC
+```
+
+The two `dbc-*` names must share IPs with `ncalifornia.privatelink`, not with `tunnel.privatelink`. Override `WorkspacePublicDnsName` / `WorkspacePrivatelinkDnsName` if the workspace hostname changes.
 
 Defaults are `10.10.0.0/18` with us-west-1 PrivateLink service names. Changing **existing** CIDRs on a stack replaces those subnets; adding the public CIDRs `10.10.8.0/24` and `10.10.9.0/24` is an in-place update if those blocks are free.
 
