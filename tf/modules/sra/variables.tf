@@ -278,6 +278,12 @@ variable "sql_warehouse_auto_stop_mins" {
   default     = 10
 }
 
+variable "sql_warehouse_enable_serverless" {
+  description = "Whether the starter SQL warehouse uses serverless compute. Default false (classic Pro warehouse in the customer VPC). Set true only if the workspace is eligible for serverless."
+  type        = bool
+  default     = false
+}
+
 # General Access (Workspace API) PrivateLink Endpoint configuration
 # This variable allows mapping regions to multiple endpoint properties:
 # - primary_endpoint: The main endpoint service name (required)

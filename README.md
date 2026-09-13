@@ -94,12 +94,13 @@ This Databricks account does not support `ingress.cross_workspace_access` on acc
 
 ## Starter SQL warehouse
 
-Terraform manages the workspace **Starter Warehouse** as a serverless PRO SQL warehouse. Size defaults to **`2X-Small`** (instead of Small). Set it in tfvars:
+Terraform manages the workspace **Starter Warehouse** as a **classic Pro** SQL warehouse (not serverless). Size defaults to **`2X-Small`**. This workspace is not eligible for serverless compute (`Workspace … is no longer eligible for Serverless Compute`). Set it in tfvars:
 
 ```hcl
-sql_warehouse_name           = "Starter Warehouse"
-sql_warehouse_cluster_size   = "2X-Small"   # or X-Small, Small, Medium, ...
-sql_warehouse_auto_stop_mins = 10
+sql_warehouse_name              = "Starter Warehouse"
+sql_warehouse_cluster_size      = "2X-Small"   # or X-Small, Small, Medium, ...
+sql_warehouse_auto_stop_mins    = 10
+sql_warehouse_enable_serverless = false        # true only if serverless is enabled for the workspace
 ```
 
 If the warehouse already exists, import it before apply:

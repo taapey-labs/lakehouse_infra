@@ -196,3 +196,9 @@ variable "sql_warehouse_auto_stop_mins" {
   default     = 10
   description = "Minutes of inactivity before the starter SQL warehouse stops."
 }
+
+variable "sql_warehouse_enable_serverless" {
+  type        = bool
+  default     = false
+  description = "Whether the starter SQL warehouse uses serverless compute. Default false because this workspace is not eligible for serverless."
+}
