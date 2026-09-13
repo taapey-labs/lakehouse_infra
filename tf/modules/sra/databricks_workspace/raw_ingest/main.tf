@@ -205,7 +205,7 @@ resource "time_sleep" "raw_ingest_iam" {
 
 resource "databricks_external_location" "raw_ingest" {
   name            = "${var.resource_prefix}-raw-ingest-external-location"
-  url             = "s3://${aws_s3_bucket.raw_ingest.id}/"
+  url             = "s3://${aws_s3_bucket.raw_ingest.id}/base"
   credential_name = databricks_storage_credential.raw_ingest.id
   comment         = "Landing zone for raw data ingested from outside Databricks"
   isolation_mode  = "ISOLATION_MODE_OPEN"

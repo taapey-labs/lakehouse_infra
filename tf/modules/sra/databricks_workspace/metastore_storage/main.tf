@@ -114,7 +114,7 @@ resource "time_sleep" "metastore_iam" {
 
 resource "databricks_external_location" "metastore" {
   name            = "${var.resource_prefix}-metastore-external-location"
-  url             = "s3://${var.metastore_bucket_id}/"
+  url             = "s3://${var.metastore_bucket_id}/base"
   credential_name = databricks_storage_credential.metastore.id
   comment         = "Dedicated Unity Catalog metastore storage bucket"
   isolation_mode  = "ISOLATION_MODE_OPEN"
