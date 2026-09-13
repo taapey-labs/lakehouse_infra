@@ -200,6 +200,13 @@ resource "databricks_grant" "workspace_catalog" {
   privileges = ["ALL_PRIVILEGES"]
 }
 
+resource "databricks_grant" "workspace_catalog_storage_credential" {
+  count              = var.is_serverless ? 0 : 1
+  storage_credential = databricks_storage_credential.workspace_catalog_storage_credential[0].id
+  principal          = var.user_workspace_catalog_admin
+  privileges         = ["ALL_PRIVILEGES", "MANAGE"]
+}
+
 # =============================================================================
 # State Moves
 # =============================================================================
