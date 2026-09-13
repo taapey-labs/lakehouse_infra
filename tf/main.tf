@@ -24,6 +24,7 @@ module "aws_databricks_sra" {
   custom_scc_relay_vpce_id      = var.custom_scc_relay_vpce_id
   context_based_ingress_ip_acl                  = var.context_based_ingress_ip_acl
   serverless_private_endpoint_rules             = var.serverless_private_endpoint_rules
+  workspace_network_policy_id                   = var.workspace_network_policy_id
 
   sql_warehouse_name           = var.sql_warehouse_name
   sql_warehouse_cluster_size   = var.sql_warehouse_cluster_size

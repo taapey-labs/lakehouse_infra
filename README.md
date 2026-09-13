@@ -88,7 +88,7 @@ terraform -chdir=tf apply \
 
 Auth: AWS credential chain plus `DATABRICKS_CLIENT_ID` / `DATABRICKS_CLIENT_SECRET` (and matching Terraform variables).
 
-This Databricks account does not support `ingress.cross_workspace_access` on account network policies, so this repo does not create `{prefix}-uc-ingress-np`. The workspace policy `{prefix}-np` uses **egress `FULL_ACCESS`** so Unity Catalog is not blocked with `403 Unauthorized network access to workspace`.
+This Databricks account does not support `ingress.cross_workspace_access` on custom network policies. `{prefix}-np` is still created but **not attached**. The workspace is bound to Databricks **`default-policy`**, which allows the Unity Catalog backend. Attaching `{prefix}-np` produces `403 Unauthorized network access to workspace` (SQLSTATE `KCUC4`) for workspace `7474647671578063`. Override `workspace_network_policy_id` only if you have a custom policy that explicitly allows UC.
 
 `audit_log_delivery_exists` defaults to `true` so SRA does not recreate `{prefix}-audit-log-delivery-credential` when that MWS credential already exists. Set it to `false` only for a brand-new account that has never had audit log delivery configured.
 
