@@ -117,9 +117,10 @@ resource "databricks_external_location" "metastore" {
   url             = "s3://${var.metastore_bucket_id}/base"
   credential_name = databricks_storage_credential.metastore.id
   comment         = "Dedicated Unity Catalog metastore storage bucket"
-  isolation_mode  = "ISOLATION_MODE_OPEN"
-  skip_validation = true
-  depends_on      = [time_sleep.metastore_iam]
+  isolation_mode     = "ISOLATION_MODE_OPEN"
+  skip_validation    = true
+  enable_file_events = false
+  depends_on         = [time_sleep.metastore_iam]
 }
 
 resource "databricks_grant" "metastore_admin" {

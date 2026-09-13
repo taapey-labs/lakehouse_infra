@@ -208,9 +208,10 @@ resource "databricks_external_location" "raw_ingest" {
   url             = "s3://${aws_s3_bucket.raw_ingest.id}/base"
   credential_name = databricks_storage_credential.raw_ingest.id
   comment         = "Landing zone for raw data ingested from outside Databricks"
-  isolation_mode  = "ISOLATION_MODE_OPEN"
-  skip_validation = true
-  depends_on      = [time_sleep.raw_ingest_iam]
+  isolation_mode     = "ISOLATION_MODE_OPEN"
+  skip_validation    = true
+  enable_file_events = false
+  depends_on         = [time_sleep.raw_ingest_iam]
 }
 
 resource "databricks_grant" "raw_ingest_admin" {

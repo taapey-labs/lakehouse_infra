@@ -169,6 +169,7 @@ resource "databricks_external_location" "workspace_catalog_external_location" {
   credential_name = databricks_storage_credential.workspace_catalog_storage_credential[0].id
   comment         = "External location for catalog ${var.uc_catalog_name}"
   isolation_mode  = "ISOLATION_MODE_ISOLATED"
+  enable_file_events = false
   depends_on      = [aws_iam_policy_attachment.unity_catalog_attach, time_sleep.wait_60_seconds]
 }
 
