@@ -4,7 +4,7 @@ output "workspace_host" {
 }
 
 output "workspace_network_policy_id" {
-  description = "Network policy attached to the workspace ({prefix}-np with Unity Catalog cross-workspace ingress)."
+  description = "Network policy attached to the workspace (default-policy; this account cannot set cross_workspace_access on {prefix}-np)."
   value       = module.aws_databricks_sra.workspace_network_policy_id
 }
 
