@@ -97,15 +97,21 @@ variable "create_service_direct_vpce" {
 }
 
 variable "cross_workspace_ingress_allowed_workspace_ids" {
-  description = "Optional list of source workspace IDs allowed to reach this workspace over the account network policy's cross-workspace ingress. Cross-workspace access defaults to RESTRICTED_ACCESS; leave empty to permit no cross-workspace ingress."
+  description = "Unused. Unity Catalog is not this workspace ID; cross-workspace ingress uses restriction_mode instead."
   type        = list(number)
   default     = []
 }
 
-variable "workspace_network_policy_id" {
-  description = "Network policy attached to the workspace. Custom {prefix}-np cannot set ingress.cross_workspace_access on this account, so Unity Catalog is denied (403 KCUC4). Bind default-policy unless you have a custom policy that explicitly allows UC."
+variable "cross_workspace_ingress_restriction_mode" {
+  description = "ingress.cross_workspace_access.restriction_mode on {prefix}-np. FULL_ACCESS allows Unity Catalog (403 KCUC4 otherwise). LEGACY_MODE is Compatibility mode."
   type        = string
-  default     = "default-policy"
+  default     = "FULL_ACCESS"
+}
+
+variable "workspace_network_policy_id" {
+  description = "Network policy attached to the workspace. Empty/null attaches {resource_prefix}-np (the policy this stack updates for Unity Catalog)."
+  type        = string
+  default     = null
 }
 
 variable "custom_general_access_mws_vpce_id" {

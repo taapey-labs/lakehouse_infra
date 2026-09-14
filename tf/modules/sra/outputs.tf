@@ -4,7 +4,7 @@ output "workspace_host" {
 
 output "workspace_network_policy_id" {
   description = "Network policy currently attached to the workspace."
-  value       = var.workspace_network_policy_id
+  value       = coalesce(var.workspace_network_policy_id, module.network_policy.network_policy_id)
 }
 
 output "catalog_name" {
