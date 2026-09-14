@@ -38,6 +38,8 @@ Metadata:
       - Label:
           default: Workspace PrivateLink DNS (Route 53)
         Parameters:
+          - CloudDatabricksPrivateZoneName
+          - SccTunnelDnsName
           - DatabricksRegionalRestDnsName
           - WorkspacePublicDnsName
       - Label:
@@ -132,22 +134,38 @@ Parameters:
     Default: com.amazonaws.vpce.us-west-1.vpce-svc-04cb91f9372b792fe
     Description: Databricks SCC relay PrivateLink service name. Default is us-west-1.
 
+  CloudDatabricksPrivateZoneName:
+    Type: String
+    Default: cloud.databricks.com
+    AllowedPattern: '^$|^[a-z0-9.-]+\.databricks\.com$'
+    Description: >-
+      Single private hosted zone for Databricks hostnames in this VPC. Records
+      (not extra zones) live here, including tunnel.privatelink under this apex.
+      Leave empty to skip.
+
+  SccTunnelDnsName:
+    Type: String
+    Default: tunnel.privatelink.cloud.databricks.com
+    AllowedPattern: '^$|^[a-z0-9.-]+\.privatelink\.cloud\.databricks\.com$'
+    Description: >-
+      SCC / ngrok hostname. A-alias in the cloud.databricks.com private zone to
+      the SCC VPCE (vpce-svc-04cb91f9372b792fe), not REST.
+
   DatabricksRegionalRestDnsName:
     Type: String
     Default: ncalifornia.cloud.databricks.com
     AllowedPattern: '^$|^[a-z0-9.-]+\.cloud\.databricks\.com$'
     Description: >-
-      Regional REST hostname (us-west-1 is ncalifornia.cloud.databricks.com).
-      Dedicated private hosted zone (not a cloud.databricks.com apex) A-aliased
-      to the REST VPC endpoint. Leave empty to skip.
+      Regional REST hostname. A-alias in the cloud.databricks.com private zone
+      to the REST VPCE. Leave empty to skip.
 
   WorkspacePublicDnsName:
     Type: String
     Default: dbc-541c1fdc-07c5.cloud.databricks.com
     AllowedPattern: '^$|^[a-z0-9.-]+\.cloud\.databricks\.com$'
     Description: >-
-      Public workspace hostname. Dedicated private hosted zone A-aliased to the
-      REST VPCE. Leave empty to skip. Override if the dbc-* name changes.
+      Public workspace hostname. A-alias in the cloud.databricks.com private
+      zone to the REST VPCE. Leave empty to skip.
 
   S3PrefixListId:
     Type: String
@@ -161,14 +179,37 @@ Conditions:
     - !Equals
       - !Ref S3PrefixListId
       - ''
-  HasDatabricksRegionalRestDnsName: !Not
+  HasCloudDatabricksPrivateZone: !Not
     - !Equals
-      - !Ref DatabricksRegionalRestDnsName
+      - !Ref CloudDatabricksPrivateZoneName
       - ''
-  HasWorkspacePublicDnsName: !Not
-    - !Equals
-      - !Ref WorkspacePublicDnsName
-      - ''
+  HasSccTunnelDnsName: !And
+    - !Not
+      - !Equals
+        - !Ref CloudDatabricksPrivateZoneName
+        - ''
+    - !Not
+      - !Equals
+        - !Ref SccTunnelDnsName
+        - ''
+  HasDatabricksRegionalRestDnsName: !And
+    - !Not
+      - !Equals
+        - !Ref CloudDatabricksPrivateZoneName
+        - ''
+    - !Not
+      - !Equals
+        - !Ref DatabricksRegionalRestDnsName
+        - ''
+  HasWorkspacePublicDnsName: !And
+    - !Not
+      - !Equals
+        - !Ref CloudDatabricksPrivateZoneName
+        - ''
+    - !Not
+      - !Equals
+        - !Ref WorkspacePublicDnsName
+        - ''
 
 Resources:
   Vpc:
@@ -618,7 +659,7 @@ Resources:
           Value: !Ref ProjectName
 
   # SCC relay. Do not enable AWS-managed private DNS here: it fights the REST endpoint's
-  # privatelink.cloud.databricks.com zone. Pin tunnel.* with an explicit hosted zone below.
+  # privatelink zone. Pin tunnel.privatelink as a record in cloud.databricks.com.
   DatabricksSccRelayVpcEndpoint:
     Type: AWS::EC2::VPCEndpoint
     Properties:
@@ -637,64 +678,45 @@ Resources:
         - Key: Project
           Value: !Ref ProjectName
 
-  SccRelayPrivateHostedZone:
+  CloudDatabricksPrivateHostedZone:
     Type: AWS::Route53::HostedZone
-    DependsOn: DatabricksSccRelayVpcEndpoint
+    Condition: HasCloudDatabricksPrivateZone
     Properties:
-      Name: tunnel.privatelink.cloud.databricks.com
+      Name: !Ref CloudDatabricksPrivateZoneName
       VPCs:
         - VPCId: !Ref Vpc
           VPCRegion: !Ref AWS::Region
       HostedZoneConfig:
-        Comment: Pin Databricks SCC relay PrivateLink to the relay VPC endpoint
+        Comment: Databricks REST and SCC hostnames in this VPC
       HostedZoneTags:
         - Key: Name
-          Value: !Sub ${ProjectName}-scc-tunnel-phz
+          Value: !Sub ${ProjectName}-cloud-databricks-phz
         - Key: Project
           Value: !Ref ProjectName
 
   SccRelayTunnelRecord:
     Type: AWS::Route53::RecordSet
+    Condition: HasSccTunnelDnsName
     DependsOn:
       - DatabricksSccRelayVpcEndpoint
-      - SccRelayPrivateHostedZone
+      - CloudDatabricksPrivateHostedZone
     Properties:
-      HostedZoneId: !Ref SccRelayPrivateHostedZone
-      Name: tunnel.privatelink.cloud.databricks.com
+      HostedZoneId: !Ref CloudDatabricksPrivateHostedZone
+      Name: !Ref SccTunnelDnsName
       Type: A
       AliasTarget:
         HostedZoneId: !Select [0, !Split [':', !Select [0, !GetAtt DatabricksSccRelayVpcEndpoint.DnsEntries]]]
         DNSName: !Select [1, !Split [':', !Select [0, !GetAtt DatabricksSccRelayVpcEndpoint.DnsEntries]]]
         EvaluateTargetHealth: false
 
-  # Exact-name zones only. A parent cloud.databricks.com PHZ returns NXDOMAIN for
-  # every other hostname under that domain (no fallthrough to public DNS), which
-  # breaks classic cluster bootstrap (BOOTSTRAP_TIMEOUT) even when tunnel.privatelink
-  # has its own zone. Do not add a wildcard.
-  DatabricksRegionalRestPrivateHostedZone:
-    Type: AWS::Route53::HostedZone
-    Condition: HasDatabricksRegionalRestDnsName
-    Properties:
-      Name: !Ref DatabricksRegionalRestDnsName
-      VPCs:
-        - VPCId: !Ref Vpc
-          VPCRegion: !Ref AWS::Region
-      HostedZoneConfig:
-        Comment: Databricks regional REST hostname -> REST VPCE
-      HostedZoneTags:
-        - Key: Name
-          Value: !Sub ${ProjectName}-ncalifornia-rest-phz
-        - Key: Project
-          Value: !Ref ProjectName
-
   DatabricksRegionalRestAliasRecord:
     Type: AWS::Route53::RecordSet
     Condition: HasDatabricksRegionalRestDnsName
     DependsOn:
       - DatabricksWorkspaceVpcEndpoint
-      - DatabricksRegionalRestPrivateHostedZone
+      - CloudDatabricksPrivateHostedZone
     Properties:
-      HostedZoneId: !Ref DatabricksRegionalRestPrivateHostedZone
+      HostedZoneId: !Ref CloudDatabricksPrivateHostedZone
       Name: !Ref DatabricksRegionalRestDnsName
       Type: A
       AliasTarget:
@@ -702,30 +724,14 @@ Resources:
         DNSName: !Select [1, !Split [':', !Select [0, !GetAtt DatabricksWorkspaceVpcEndpoint.DnsEntries]]]
         EvaluateTargetHealth: false
 
-  WorkspacePublicPrivateHostedZone:
-    Type: AWS::Route53::HostedZone
-    Condition: HasWorkspacePublicDnsName
-    Properties:
-      Name: !Ref WorkspacePublicDnsName
-      VPCs:
-        - VPCId: !Ref Vpc
-          VPCRegion: !Ref AWS::Region
-      HostedZoneConfig:
-        Comment: Databricks workspace public hostname -> REST VPCE
-      HostedZoneTags:
-        - Key: Name
-          Value: !Sub ${ProjectName}-workspace-public-phz
-        - Key: Project
-          Value: !Ref ProjectName
-
   WorkspacePublicAliasRecord:
     Type: AWS::Route53::RecordSet
     Condition: HasWorkspacePublicDnsName
     DependsOn:
       - DatabricksWorkspaceVpcEndpoint
-      - WorkspacePublicPrivateHostedZone
+      - CloudDatabricksPrivateHostedZone
     Properties:
-      HostedZoneId: !Ref WorkspacePublicPrivateHostedZone
+      HostedZoneId: !Ref CloudDatabricksPrivateHostedZone
       Name: !Ref WorkspacePublicDnsName
       Type: A
       AliasTarget:
@@ -768,14 +774,10 @@ Outputs:
   DatabricksSccRelayVpcEndpointId:
     Description: custom_scc_relay_vpce_id for SRA
     Value: !Ref DatabricksSccRelayVpcEndpoint
-  DatabricksRegionalRestPrivateHostedZoneId:
-    Description: Route 53 private hosted zone for ncalifornia.cloud.databricks.com (REST VPCE)
-    Condition: HasDatabricksRegionalRestDnsName
-    Value: !Ref DatabricksRegionalRestPrivateHostedZone
-  WorkspacePublicPrivateHostedZoneId:
-    Description: Route 53 private hosted zone for the public workspace hostname (REST VPCE)
-    Condition: HasWorkspacePublicDnsName
-    Value: !Ref WorkspacePublicPrivateHostedZone
+  CloudDatabricksPrivateHostedZoneId:
+    Description: Route 53 private hosted zone for cloud.databricks.com (this VPC only)
+    Condition: HasCloudDatabricksPrivateZone
+    Value: !Ref CloudDatabricksPrivateHostedZone
   StsVpcEndpointId:
     Value: !Ref StsVpcEndpoint
   KinesisVpcEndpointId:
