@@ -43,6 +43,8 @@ Also:
 
 There are no dedicated hosted zones for `dbc-541c1fdc-07c5.cloud.databricks.com` or `tunnel.privatelink.cloud.databricks.com`. Do **not** add a wildcard. Unmatched names under the apex NXDOMAIN (no public-DNS fallthrough).
 
+If a stack update fails with `WorkspacePublicPrivateHostedZone` / `DatabricksRegionalRestPrivateHostedZone` failed to create, that template was still creating those dedicated zones (they already exist, or they conflict). Use this template instead, then in Route 53 delete any leftover private hosted zones with those exact names (and `ncalifornia.cloud.databricks.com` if it is a separate zone) so they do not stay associated with the VPC. Retry the stack update; CloudFormation will only manage `cloud.databricks.com`.
+
 From a host in the VPC:
 
 ```text
