@@ -154,8 +154,8 @@ resource "databricks_mws_workspaces" "workspace" {
   depends_on = [databricks_mws_networks.this]
 }
 
-# Attach the Network Policy (default-policy allows Unity Catalog; {prefix}-np does not
-# on this account because ingress.cross_workspace_access cannot be set).
+# Attach the Network Policy. {prefix}-np now sets cross_workspace_access so the
+# Unity Catalog backend is not 403 KCUC4.
 resource "databricks_workspace_network_option" "workspace_assignment" {
   network_policy_id = var.network_policy_id
   workspace_id      = databricks_mws_workspaces.workspace.workspace_id

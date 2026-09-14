@@ -39,6 +39,7 @@ module "network_policy" {
 
   context_based_ingress_ip_acl                  = var.context_based_ingress_ip_acl
   cross_workspace_ingress_allowed_workspace_ids = var.cross_workspace_ingress_allowed_workspace_ids
+  cross_workspace_ingress_restriction_mode      = var.cross_workspace_ingress_restriction_mode
   databricks_account_id                         = var.databricks_account_id
   enable_security_analysis_tool                 = var.enable_security_analysis_tool
   region                                        = var.region
@@ -97,7 +98,7 @@ module "databricks_mws_workspace" {
 
   # Network Connectivity Configuration and Network Policy
   network_connectivity_configuration_id = module.network_connectivity_configuration.ncc_id
-  network_policy_id                     = var.workspace_network_policy_id
+  network_policy_id                     = coalesce(var.workspace_network_policy_id, module.network_policy.network_policy_id)
 
   depends_on = [module.unity_catalog_metastore_creation, module.network_connectivity_configuration, module.network_policy, module.disable_legacy_features]
 }

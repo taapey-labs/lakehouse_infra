@@ -124,12 +124,19 @@ variable "custom_scc_relay_vpce_id" {
   description = "AWS vpce- id from CloudFormation DatabricksSccRelayVpcEndpointId (SCC). Do not pass a Databricks account (MWS) VPC endpoint UUID."
 }
 
-# Unused by the attached default-policy. Kept so a future custom policy can
-# allow-list source workspaces if this account gains cross_workspace_access.
+# Allow-listing only this workspace ID does not permit Unity Catalog (the UC
+# backend is a different source workspace). Cross-workspace ingress is
+# FULL_ACCESS on {prefix}-np instead.
 variable "cross_workspace_ingress_allowed_workspace_ids" {
   type        = list(number)
-  description = "Source workspace IDs for a custom SRA network policy (not applied while workspace_network_policy_id is default-policy)"
+  description = "Unused. Kept for compatibility with older tfvars."
   default     = [7474647671578063]
+}
+
+variable "cross_workspace_ingress_restriction_mode" {
+  type        = string
+  description = "FULL_ACCESS allows Unity Catalog into the workspace. LEGACY_MODE is Compatibility mode. RESTRICTED_ACCESS still allows all source workspaces."
+  default     = "FULL_ACCESS"
 }
 
 variable "workspace_id" {
@@ -138,12 +145,13 @@ variable "workspace_id" {
   default     = 7474647671578063
 }
 
-# {prefix}-np cannot allow Unity Catalog on this account (no cross_workspace_access).
-# Bind Databricks default-policy so UC is not 403 KCUC4.
+# Attach {resource_prefix}-np by default (this stack sets cross_workspace_access
+# on that policy). Set to "default-policy" only after confirming that policy
+# also allows Unity Catalog.
 variable "workspace_network_policy_id" {
   type        = string
-  description = "Account network policy attached to the workspace"
-  default     = "default-policy"
+  description = "Account network policy attached to the workspace. Null attaches {resource_prefix}-np."
+  default     = null
 }
 
 # Option 1: public/context-based ingress IP allow list. Empty = SRA public_access FULL_ACCESS.
