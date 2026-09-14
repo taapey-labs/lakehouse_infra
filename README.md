@@ -37,21 +37,20 @@ Also:
 - REST VPCE (`vpce-svc-09bb6ca26208063f2`) keeps AWS private DNS (`ncalifornia.privatelink.cloud.databricks.com`)
 - SCC VPCE (`vpce-svc-04cb91f9372b792fe`) private DNS is **off**
 - Route 53 aliases `tunnel.privatelink.cloud.databricks.com` to the **SCC** endpoint
-- Route 53 private hosted zone `cloud.databricks.com` is associated with this VPC only (not public DNS, not the AWS-managed privatelink zone)
-- Route 53 aliases `ncalifornia.cloud.databricks.com` and `dbc-541c1fdc-07c5.cloud.databricks.com` to the **REST** VPC endpoint (`vpce-svc-09bb6ca26208063f2`)
+- Dedicated Route 53 private hosted zones (exact names, not a `cloud.databricks.com` apex) alias `ncalifornia.cloud.databricks.com` and `dbc-541c1fdc-07c5.cloud.databricks.com` to the **REST** endpoint
 
-Do **not** add a wildcard `*.cloud.databricks.com` or a parent `privatelink.cloud.databricks.com` zone. Those overlay SCC and REST onto one VPCE. The `cloud.databricks.com` private zone has **explicit records only**. `tunnel.privatelink` stays on its own more-specific zone.
+Do **not** create a private hosted zone for the apex `cloud.databricks.com` (or a wildcard). Route 53 does not fall through to public DNS: any other name under that apex returns NXDOMAIN, classic clusters fail with `BOOTSTRAP_TIMEOUT`, and a wildcard can send SCC traffic to the REST NLB.
 
 From a host in the VPC:
 
 ```text
 nslookup ncalifornia.privatelink.cloud.databricks.com       # REST ENIs
-nslookup ncalifornia.cloud.databricks.com                   # same REST ENIs (apex PHZ alias)
+nslookup ncalifornia.cloud.databricks.com                   # REST ENIs
 nslookup tunnel.privatelink.cloud.databricks.com            # SCC ENIs
 nslookup dbc-541c1fdc-07c5.cloud.databricks.com             # REST ENIs, not SCC
 ```
 
-`dbc-541c1fdc-07c5.cloud.databricks.com` must share IPs with `ncalifornia.privatelink`, not with `tunnel.privatelink`. Override `WorkspacePublicDnsName` if the workspace hostname changes.
+`dbc-541c1fdc-07c5.cloud.databricks.com` must share IPs with `ncalifornia.privatelink`, not with `tunnel.privatelink`. Override `WorkspacePublicDnsName` / `DatabricksRegionalRestDnsName` if those hostnames change. After replacing the apex zone, **restart the classic cluster**.
 
 Defaults are `10.10.0.0/18` with us-west-1 PrivateLink service names. Changing **existing** CIDRs on a stack replaces those subnets; adding the public CIDRs `10.10.8.0/24` and `10.10.9.0/24` is an in-place update if those blocks are free.
 
@@ -148,11 +147,11 @@ If `raw_ingest_trusted_principal_arns` is empty, only Databricks Unity Catalog c
 
 Classic compute over PrivateLink opens an SCC (ngrok) tunnel to `tunnel.privatelink.cloud.databricks.com` (TCP **2443** FIPS and **6666**). If that name is answered by the REST VPCE zone, the driver hits `BOOTSTRAP_TIMEOUT` / “check network connectivity from the data plane to the control plane” because 2443/6666 are refused on the REST NLB.
 
-The customer VPC template disables AWS private DNS on the SCC endpoint and aliases `tunnel.privatelink` to that endpoint in Route 53. After updating the CloudFormation stack, restart the classic cluster. From a workspace subnet:
+The customer VPC template disables AWS private DNS on the SCC endpoint and aliases `tunnel.privatelink` to that endpoint in Route 53. Do **not** associate a private hosted zone for the apex `cloud.databricks.com` with the VPC: unmatched names under that apex NXDOMAIN and classic clusters time out even when the tunnel record exists. After updating the CloudFormation stack, delete any leftover apex `cloud.databricks.com` private zone in Route 53 and restart the classic cluster. From a workspace subnet:
 
 ```bash
 nslookup ncalifornia.privatelink.cloud.databricks.com   # REST VPCE ENIs
-nslookup ncalifornia.cloud.databricks.com                # REST VPCE ENIs (cloud.databricks.com PHZ)
+nslookup ncalifornia.cloud.databricks.com                # REST VPCE ENIs (exact-name PHZ)
 nslookup tunnel.privatelink.cloud.databricks.com         # SCC VPCE ENIs (not the REST pair)
 nc -zv tunnel.privatelink.cloud.databricks.com 2443
 nc -zv tunnel.privatelink.cloud.databricks.com 6666
