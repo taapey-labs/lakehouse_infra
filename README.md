@@ -37,14 +37,17 @@ Also:
 - REST VPCE (`vpce-svc-09bb6ca26208063f2`) keeps AWS private DNS (`ncalifornia.privatelink.cloud.databricks.com`)
 - SCC VPCE (`vpce-svc-04cb91f9372b792fe`) private DNS is **off**
 - Route 53 aliases `tunnel.privatelink.cloud.databricks.com` to the **SCC** endpoint
+- Route 53 private hosted zone `cloud.databricks.com` is associated with this VPC only (not public DNS, not the AWS-managed privatelink zone)
+- Route 53 aliases `ncalifornia.cloud.databricks.com` to the **REST** VPC endpoint regional DNS (`vpce-svc-09bb6ca26208063f2`)
 - Route 53 aliases `dbc-541c1fdc-07c5.cloud.databricks.com` and `dbc-541c1fdc-07c5.privatelink.cloud.databricks.com` to the **REST** endpoint
 
-Do **not** create a wildcard `*.cloud.databricks.com` or a parent `privatelink.cloud.databricks.com` / `cloud.databricks.com` private zone. Those overlay SCC and REST onto one VPCE: the workspace URL then hits the tunnel NLB and REST/Unity Catalog calls return 400/403.
+Do **not** add a wildcard `*.cloud.databricks.com` or a parent `privatelink.cloud.databricks.com` zone. Those overlay SCC and REST onto one VPCE. The `cloud.databricks.com` private zone has **explicit records only**; more-specific zones still own `dbc-*` and `tunnel.privatelink`.
 
 From a host in the VPC:
 
 ```text
 nslookup ncalifornia.privatelink.cloud.databricks.com       # REST ENIs
+nslookup ncalifornia.cloud.databricks.com                   # same REST ENIs (apex PHZ alias)
 nslookup tunnel.privatelink.cloud.databricks.com            # SCC ENIs
 nslookup dbc-541c1fdc-07c5.cloud.databricks.com             # REST ENIs, not SCC
 nslookup dbc-541c1fdc-07c5.privatelink.cloud.databricks.com  # REST ENIs, not SCC
@@ -151,6 +154,7 @@ The customer VPC template disables AWS private DNS on the SCC endpoint and alias
 
 ```bash
 nslookup ncalifornia.privatelink.cloud.databricks.com   # REST VPCE ENIs
+nslookup ncalifornia.cloud.databricks.com                # REST VPCE ENIs (cloud.databricks.com PHZ)
 nslookup tunnel.privatelink.cloud.databricks.com         # SCC VPCE ENIs (not the REST pair)
 nc -zv tunnel.privatelink.cloud.databricks.com 2443
 nc -zv tunnel.privatelink.cloud.databricks.com 6666
