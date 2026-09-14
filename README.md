@@ -38,10 +38,9 @@ Also:
 - SCC VPCE (`vpce-svc-04cb91f9372b792fe`) private DNS is **off**
 - Route 53 aliases `tunnel.privatelink.cloud.databricks.com` to the **SCC** endpoint
 - Route 53 private hosted zone `cloud.databricks.com` is associated with this VPC only (not public DNS, not the AWS-managed privatelink zone)
-- Route 53 aliases `ncalifornia.cloud.databricks.com` to the **REST** VPC endpoint regional DNS (`vpce-svc-09bb6ca26208063f2`)
-- Route 53 aliases `dbc-541c1fdc-07c5.cloud.databricks.com` and `dbc-541c1fdc-07c5.privatelink.cloud.databricks.com` to the **REST** endpoint
+- Route 53 aliases `ncalifornia.cloud.databricks.com` and `dbc-541c1fdc-07c5.cloud.databricks.com` to the **REST** VPC endpoint (`vpce-svc-09bb6ca26208063f2`)
 
-Do **not** add a wildcard `*.cloud.databricks.com` or a parent `privatelink.cloud.databricks.com` zone. Those overlay SCC and REST onto one VPCE. The `cloud.databricks.com` private zone has **explicit records only**; more-specific zones still own `dbc-*` and `tunnel.privatelink`.
+Do **not** add a wildcard `*.cloud.databricks.com` or a parent `privatelink.cloud.databricks.com` zone. Those overlay SCC and REST onto one VPCE. The `cloud.databricks.com` private zone has **explicit records only**. `tunnel.privatelink` stays on its own more-specific zone.
 
 From a host in the VPC:
 
@@ -50,10 +49,9 @@ nslookup ncalifornia.privatelink.cloud.databricks.com       # REST ENIs
 nslookup ncalifornia.cloud.databricks.com                   # same REST ENIs (apex PHZ alias)
 nslookup tunnel.privatelink.cloud.databricks.com            # SCC ENIs
 nslookup dbc-541c1fdc-07c5.cloud.databricks.com             # REST ENIs, not SCC
-nslookup dbc-541c1fdc-07c5.privatelink.cloud.databricks.com  # REST ENIs, not SCC
 ```
 
-The two `dbc-*` names must share IPs with `ncalifornia.privatelink`, not with `tunnel.privatelink`. Override `WorkspacePublicDnsName` / `WorkspacePrivatelinkDnsName` if the workspace hostname changes.
+`dbc-541c1fdc-07c5.cloud.databricks.com` must share IPs with `ncalifornia.privatelink`, not with `tunnel.privatelink`. Override `WorkspacePublicDnsName` if the workspace hostname changes.
 
 Defaults are `10.10.0.0/18` with us-west-1 PrivateLink service names. Changing **existing** CIDRs on a stack replaces those subnets; adding the public CIDRs `10.10.8.0/24` and `10.10.9.0/24` is an in-place update if those blocks are free.
 
