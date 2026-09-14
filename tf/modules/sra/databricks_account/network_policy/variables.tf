@@ -5,20 +5,9 @@ variable "context_based_ingress_ip_acl" {
 }
 
 variable "cross_workspace_ingress_allowed_workspace_ids" {
-  description = "Unused. Allow-listing only this workspace ID does not permit Unity Catalog (UC is a different source workspace). Cross-workspace ingress is FULL_ACCESS unless overridden."
+  description = "Unused. This account cannot set ingress.cross_workspace_access."
   type        = list(number)
   default     = []
-}
-
-variable "cross_workspace_ingress_restriction_mode" {
-  description = "ingress.cross_workspace_access.restriction_mode. FULL_ACCESS allows Unity Catalog; LEGACY_MODE is Compatibility mode; RESTRICTED_ACCESS still allows all source workspaces so UC is not 403 KCUC4."
-  type        = string
-  default     = "FULL_ACCESS"
-
-  validation {
-    condition     = contains(["FULL_ACCESS", "LEGACY_MODE", "RESTRICTED_ACCESS"], var.cross_workspace_ingress_restriction_mode)
-    error_message = "cross_workspace_ingress_restriction_mode must be FULL_ACCESS, LEGACY_MODE, or RESTRICTED_ACCESS."
-  }
 }
 
 variable "databricks_account_id" {

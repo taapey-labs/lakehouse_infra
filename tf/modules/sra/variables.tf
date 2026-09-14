@@ -97,21 +97,15 @@ variable "create_service_direct_vpce" {
 }
 
 variable "cross_workspace_ingress_allowed_workspace_ids" {
-  description = "Unused. Unity Catalog is not this workspace ID; cross-workspace ingress uses restriction_mode instead."
+  description = "Unused. This Databricks account rejects ingress.cross_workspace_access on custom policies."
   type        = list(number)
   default     = []
 }
 
-variable "cross_workspace_ingress_restriction_mode" {
-  description = "ingress.cross_workspace_access.restriction_mode on {prefix}-np. FULL_ACCESS allows Unity Catalog (403 KCUC4 otherwise). LEGACY_MODE is Compatibility mode."
-  type        = string
-  default     = "FULL_ACCESS"
-}
-
 variable "workspace_network_policy_id" {
-  description = "Network policy attached to the workspace. Empty/null attaches {resource_prefix}-np (the policy this stack updates for Unity Catalog)."
+  description = "Network policy attached to the workspace. This account cannot set ingress.cross_workspace_access on {prefix}-np, so Unity Catalog is denied (403 KCUC4) if that policy is attached. Bind default-policy."
   type        = string
-  default     = null
+  default     = "default-policy"
 }
 
 variable "custom_general_access_mws_vpce_id" {

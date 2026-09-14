@@ -136,11 +136,10 @@ metastore_exists = true
 # NOTE: Verify that all IPs are correct before enabling this feature to prevent a lockout scenario.
 context_based_ingress_ip_acl = []
 
-# Unity Catalog is a Databricks-managed source workspace, not this workspace ID.
-# FULL_ACCESS on {prefix}-np allows UC. Do not rely on an allow list of this workspace only.
+# Unused. This account rejects ingress.cross_workspace_access on custom policies.
+# Keep the workspace on default-policy (wrapper default) so Unity Catalog is allowed.
 cross_workspace_ingress_allowed_workspace_ids = []
-# cross_workspace_ingress_restriction_mode = "FULL_ACCESS"
-# workspace_network_policy_id = null  # attach {resource_prefix}-np
+# workspace_network_policy_id = "default-policy"
 
 # Optional name for the Unity Catalog metastore created by this deployment.
 # If left blank, defaults to "${var.region}-unity-catalog".
