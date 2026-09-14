@@ -36,12 +36,12 @@ Also:
 
 - REST VPCE (`vpce-svc-09bb6ca26208063f2`) keeps AWS private DNS (`ncalifornia.privatelink.cloud.databricks.com`)
 - SCC VPCE (`vpce-svc-04cb91f9372b792fe`) private DNS is **off**
-- Dedicated Route 53 private hosted zones (exact names only):
+- One existing Route 53 private hosted zone `cloud.databricks.com` (`Z03487763H91UHKUM9J6C`) with A-aliases (not extra hosted zones):
   - `tunnel.privatelink.cloud.databricks.com` → **SCC** VPCE
   - `ncalifornia.cloud.databricks.com` → **REST** VPCE
   - `dbc-541c1fdc-07c5.cloud.databricks.com` → **REST** VPCE
 
-Do **not** create a private hosted zone for the apex `cloud.databricks.com`. Route 53 does not fall through to public DNS, so every other name under that apex NXDOMAINs and classic clusters fail with `BOOTSTRAP_TIMEOUT`. After this stack update, confirm the apex zone is gone from the VPC. If CloudFormation fails to create the `ncalifornia` or `dbc-*` zones, delete leftover private hosted zones with those exact names in Route 53, then retry.
+Do **not** keep extra private hosted zones whose names are those FQDNs. They overlap the apex and were created by later PRs. This stack update deletes them. Override `ExistingCloudDatabricksHostedZoneId` if the apex zone ID changes.
 
 From a host in the VPC:
 
@@ -149,11 +149,11 @@ If `raw_ingest_trusted_principal_arns` is empty, only Databricks Unity Catalog c
 
 Classic compute over PrivateLink opens an SCC (ngrok) tunnel to `tunnel.privatelink.cloud.databricks.com` (TCP **2443** FIPS and **6666**). If that name is answered by the REST VPCE zone, the driver hits `BOOTSTRAP_TIMEOUT` / “check network connectivity from the data plane to the control plane” because 2443/6666 are refused on the REST NLB.
 
-The customer VPC template disables AWS private DNS on the SCC endpoint and uses a **dedicated** private hosted zone for `tunnel.privatelink.cloud.databricks.com` aliased to the SCC VPCE. Do **not** keep a `cloud.databricks.com` apex private zone on the VPC (delete it if #36 created one). After the stack update, restart the classic cluster. From a workspace subnet:
+The customer VPC template disables AWS private DNS on the SCC endpoint and A-aliases `tunnel.privatelink.cloud.databricks.com` to the SCC VPCE **inside** the existing `cloud.databricks.com` private hosted zone. After the stack update, delete leftover per-hostname hosted zones if CloudFormation did not, then restart the classic cluster. From a workspace subnet:
 
 ```bash
 nslookup ncalifornia.privatelink.cloud.databricks.com   # REST VPCE ENIs
-nslookup ncalifornia.cloud.databricks.com                # REST VPCE ENIs (exact-name PHZ)
+nslookup ncalifornia.cloud.databricks.com                # REST VPCE ENIs (A-alias in cloud.databricks.com)
 nslookup tunnel.privatelink.cloud.databricks.com         # SCC VPCE ENIs (not the REST pair)
 nc -zv tunnel.privatelink.cloud.databricks.com 2443
 nc -zv tunnel.privatelink.cloud.databricks.com 6666
