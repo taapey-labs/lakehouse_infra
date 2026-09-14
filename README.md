@@ -27,7 +27,7 @@ The template is a two-AZ playground VPC (`us-west-1`): Databricks classic comput
 | Intra / PrivateLink subnets | `PrivateLinkSubnetA/B` (`/26`) — **not** workspace subnets |
 | S3 gateway + STS + Kinesis + EC2 | STS, Kinesis, and EC2 on PrivateLink subnets |
 | Databricks REST + SCC VPCEs | Same, on PrivateLink subnets (existing SRA custom IDs) |
-| Workspace SG | Databricks ports (443, 2443, 6666, 8443–8451, 80) to `0.0.0.0/0` plus S3 prefix list |
+| Workspace SG | Egress TCP/UDP self; TCP `0.0.0.0/0` on 443, 3306, 53, 6666, 2443, 5432, 8443–8451 (Databricks customer-managed VPC check); HTTP 80; S3 prefix list |
 | PrivateLink SG 443/2443/5432/6666/8443–8451 | Ingress from workspace SG |
 
 PrivateLink is kept so the current workspace registration does not break. NAT plus internet SG egress is the path for control-plane and AWS API traffic that is not pinned to a VPC endpoint.

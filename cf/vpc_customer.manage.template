@@ -405,8 +405,13 @@ Resources:
         - IpProtocol: tcp
           FromPort: 5432
           ToPort: 5432
-          CidrIp: !Ref VpcCidr
+          CidrIp: 0.0.0.0/0
           Description: Lakebase PostgreSQL
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          CidrIp: 0.0.0.0/0
+          Description: Legacy Hive metastore (Databricks SG check)
         - IpProtocol: tcp
           FromPort: 6666
           ToPort: 6666
@@ -420,12 +425,12 @@ Resources:
         - IpProtocol: tcp
           FromPort: 53
           ToPort: 53
-          CidrIp: !Ref VpcCidr
+          CidrIp: 0.0.0.0/0
           Description: DNS TCP
         - IpProtocol: udp
           FromPort: 53
           ToPort: 53
-          CidrIp: !Ref VpcCidr
+          CidrIp: 0.0.0.0/0
           Description: DNS UDP
         - IpProtocol: tcp
           FromPort: 80
