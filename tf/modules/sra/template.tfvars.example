@@ -136,8 +136,7 @@ metastore_exists = true
 # NOTE: Verify that all IPs are correct before enabling this feature to prevent a lockout scenario.
 context_based_ingress_ip_acl = []
 
-# Unused. This account rejects ingress.cross_workspace_access on custom policies.
-# Keep the workspace on default-policy (wrapper default) so Unity Catalog is allowed.
+# Custom {prefix}-np is not created. Workspace uses Databricks default-policy.
 cross_workspace_ingress_allowed_workspace_ids = []
 # workspace_network_policy_id = "default-policy"
 

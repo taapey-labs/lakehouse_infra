@@ -4,7 +4,7 @@ output "workspace_host" {
 }
 
 output "workspace_network_policy_id" {
-  description = "Network policy attached to the workspace (default-policy; this account cannot set cross_workspace_access on {prefix}-np)."
+  description = "Network policy attached to the workspace (Databricks default-policy; {prefix}-np is not created)."
   value       = module.aws_databricks_sra.workspace_network_policy_id
 }
 

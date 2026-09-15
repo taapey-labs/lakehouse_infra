@@ -30,19 +30,15 @@ module "network_connectivity_configuration" {
   resource_prefix        = var.resource_prefix
 }
 
-# Create a Network Policy
+# Custom {prefix}-np is not created (count = 0 destroys sss-aws-lakehouse-np).
 module "network_policy" {
   source = "./databricks_account/network_policy"
   providers = {
     databricks = databricks.mws
   }
 
-  context_based_ingress_ip_acl                  = var.context_based_ingress_ip_acl
-  cross_workspace_ingress_allowed_workspace_ids = var.cross_workspace_ingress_allowed_workspace_ids
-  databricks_account_id                         = var.databricks_account_id
-  enable_security_analysis_tool                 = var.enable_security_analysis_tool
-  region                                        = var.region
-  resource_prefix                               = var.resource_prefix
+  databricks_account_id = var.databricks_account_id
+  resource_prefix       = var.resource_prefix
 }
 
 # Disable legacy features like Hive Metastore, DBFS, and no-isolation shared clusters for newly created workspaces at the account level.
@@ -99,7 +95,7 @@ module "databricks_mws_workspace" {
   network_connectivity_configuration_id = module.network_connectivity_configuration.ncc_id
   network_policy_id                     = var.workspace_network_policy_id
 
-  depends_on = [module.unity_catalog_metastore_creation, module.network_connectivity_configuration, module.network_policy, module.disable_legacy_features]
+  depends_on = [module.unity_catalog_metastore_creation, module.network_connectivity_configuration, module.disable_legacy_features]
 }
 
 # Wait for the newly created workspace to become fully available. Workspace-level settings applied

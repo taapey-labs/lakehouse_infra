@@ -154,8 +154,7 @@ resource "databricks_mws_workspaces" "workspace" {
   depends_on = [databricks_mws_networks.this]
 }
 
-# Attach the Network Policy (default-policy). This account rejects
-# ingress.cross_workspace_access, so {prefix}-np must not be attached.
+# Attach Databricks default-policy. Custom {prefix}-np is not created.
 resource "databricks_workspace_network_option" "workspace_assignment" {
   network_policy_id = var.network_policy_id
   workspace_id      = databricks_mws_workspaces.workspace.workspace_id
