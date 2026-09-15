@@ -137,11 +137,10 @@ variable "workspace_id" {
   default     = 7474647671578063
 }
 
-# {prefix}-np cannot set ingress.cross_workspace_access on this account.
-# Bind Databricks default-policy so Unity Catalog is not 403 KCUC4.
+# {prefix}-np is not created. Workspace uses Databricks default-policy.
 variable "workspace_network_policy_id" {
   type        = string
-  description = "Account network policy attached to the workspace"
+  description = "Account network policy attached to the workspace (default-policy)"
   default     = "default-policy"
 }
 

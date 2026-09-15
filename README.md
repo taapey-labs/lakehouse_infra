@@ -104,7 +104,7 @@ terraform -chdir=tf apply \
 
 Auth: AWS credential chain plus `DATABRICKS_CLIENT_ID` / `DATABRICKS_CLIENT_SECRET` (and matching Terraform variables).
 
-This Databricks account **rejects** `ingress.cross_workspace_access` on custom network policies (`cross_workspace_access is not available for this account`). `{prefix}-np` is created with egress `FULL_ACCESS` and **no ingress block** (sending public-access-only ingress still default-denies Unity Catalog). The workspace is bound to Databricks **`default-policy`**. Do not attach `{prefix}-np`; that produces `403 Unauthorized network access to workspace` (SQLSTATE `KCUC4`) for workspace `7474647671578063`. Override `workspace_network_policy_id` only if Databricks has enabled cross-workspace ingress on the account.
+This Databricks account **rejects** `ingress.cross_workspace_access` on custom network policies. Terraform **does not create** `{prefix}-np` (`sss-aws-lakehouse-np`). Apply **destroys** that policy if it still exists. The workspace is bound to Databricks **`default-policy`**. If apply cannot delete the policy because the workspace is still attached, apply again after the workspace network option shows `default-policy`.
 
 `audit_log_delivery_exists` defaults to `true` so SRA does not recreate `{prefix}-audit-log-delivery-credential` when that MWS credential already exists. Set it to `false` only for a brand-new account that has never had audit log delivery configured.
 

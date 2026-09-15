@@ -103,7 +103,7 @@ variable "cross_workspace_ingress_allowed_workspace_ids" {
 }
 
 variable "workspace_network_policy_id" {
-  description = "Network policy attached to the workspace. This account cannot set ingress.cross_workspace_access on {prefix}-np, so Unity Catalog is denied (403 KCUC4) if that policy is attached. Bind default-policy."
+  description = "Network policy attached to the workspace. Custom {prefix}-np is not created; bind default-policy."
   type        = string
   default     = "default-policy"
 }
