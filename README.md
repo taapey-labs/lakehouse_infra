@@ -27,7 +27,7 @@ The template is a two-AZ playground VPC (`us-west-1`): Databricks classic comput
 | Intra / PrivateLink subnets | `PrivateLinkSubnetA/B` (`/26`) — **not** workspace subnets |
 | S3 gateway + STS + Kinesis + EC2 | STS, Kinesis, and EC2 on PrivateLink subnets |
 | Databricks REST + SCC VPCEs | Same, on PrivateLink subnets (existing SRA custom IDs) |
-| Workspace SG | Egress TCP/UDP self; TCP `0.0.0.0/0` on 443, 3306, 53, 6666, 2443, 5432, 8443–8451 (Databricks customer-managed VPC check); HTTP 80; S3 prefix list |
+| Workspace SG | Egress TCP/UDP self; TCP `0.0.0.0/0` on 443, 3306, 53, 6666, 2443, 5432, and **each** of 8443–8451 (Databricks compute-config check); UDP 53; HTTP 80; S3 prefix list; dest-SG to PrivateLink SG |
 | PrivateLink SG 443/2443/5432/6666/8443–8451 | Ingress from workspace SG |
 
 PrivateLink is kept so the current workspace registration does not break. NAT plus internet SG egress is the path for control-plane and AWS API traffic that is not pinned to a VPC endpoint.
@@ -87,6 +87,8 @@ The vendored SRA workspace module attaches `databricks_mws_vpc_endpoint.general_
 After a stack update that replaces VPCEs, pass the new AWS endpoint IDs into Terraform.
 
 After this NAT/IGW stack update, **restart the classic cluster**. Terraform does not need to change unless subnet or VPCE IDs were replaced. Do **not** put public subnet IDs in `custom_private_subnet_ids`.
+
+The Databricks compute-config warning `Egress rules in the Security Group sg-… are not configured correctly` is this CloudFormation workspace SG (`custom_sg_id`), not Unity Catalog. `terraform apply` does not change it in `custom` network mode. Update the `vpc_customer.manage` stack, then refresh Compute configuration. Required TCP to `0.0.0.0/0`: 443, 3306, 53, 6666, 2443, 5432, and each of 8443–8451; plus UDP 53.
 
 ## 2. Terraform SRA workspace
 
