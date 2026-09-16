@@ -16,6 +16,12 @@ module "unity_catalog_metastore_creation" {
   is_serverless         = local.is_serverless
   resource_prefix       = var.resource_prefix
   metastore_bucket_name = var.metastore_bucket_name
+  aws_account_id            = var.aws_account_id
+  databricks_account_id     = var.databricks_account_id
+  databricks_aws_account_id = local.databricks_aws_account_id
+  aws_iam_partition         = local.computed_aws_partition
+  aws_assume_partition      = local.assume_role_partition
+  unity_catalog_iam_arn     = local.unity_catalog_iam_arn
 }
 
 # Create Network Connectivity Connection Object
@@ -119,51 +125,45 @@ module "unity_catalog_metastore_assignment" {
   depends_on = [module.unity_catalog_metastore_creation, module.databricks_mws_workspace]
 }
 
-# Metastore bucket IAM role + workspace Unity Catalog credential (not account API).
+# Metastore external location + grants (bucket, IAM role, and credential are account-level).
 module "metastore_storage" {
   count  = local.is_serverless ? 0 : 1
   source = "./databricks_workspace/metastore_storage"
   providers = {
     databricks = databricks.created_workspace
-    aws        = aws
   }
 
-  resource_prefix       = var.resource_prefix
-  aws_account_id        = var.aws_account_id
-  databricks_account_id = var.databricks_account_id
-  aws_iam_partition     = local.computed_aws_partition
-  aws_assume_partition  = local.assume_role_partition
-  unity_catalog_iam_arn = local.unity_catalog_iam_arn
-  admin_user            = var.admin_user
-  metastore_bucket_id   = module.unity_catalog_metastore_creation.metastore_bucket_id
-  metastore_bucket_arn  = module.unity_catalog_metastore_creation.metastore_bucket_arn
+  resource_prefix         = var.resource_prefix
+  admin_user              = var.admin_user
+  metastore_bucket_id     = module.unity_catalog_metastore_creation.metastore_bucket_id
+  storage_credential_name = module.unity_catalog_metastore_creation.storage_credential_name
 
-  depends_on = [module.unity_catalog_metastore_assignment, time_sleep.wait_for_workspace]
+  depends_on = [module.unity_catalog_metastore_assignment, module.unity_catalog_metastore_creation, time_sleep.wait_for_workspace]
 }
 
 moved {
-  from = module.unity_catalog_metastore_creation.databricks_storage_credential.metastore[0]
-  to   = module.metastore_storage[0].databricks_storage_credential.metastore
+  from = module.metastore_storage[0].databricks_storage_credential.metastore
+  to   = module.unity_catalog_metastore_creation.databricks_storage_credential.metastore[0]
 }
 
 moved {
-  from = module.unity_catalog_metastore_creation.aws_iam_role.metastore[0]
-  to   = module.metastore_storage[0].aws_iam_role.metastore
+  from = module.metastore_storage[0].aws_iam_role.metastore
+  to   = module.unity_catalog_metastore_creation.aws_iam_role.metastore[0]
 }
 
 moved {
-  from = module.unity_catalog_metastore_creation.aws_iam_policy.metastore[0]
-  to   = module.metastore_storage[0].aws_iam_policy.metastore
+  from = module.metastore_storage[0].aws_iam_policy.metastore
+  to   = module.unity_catalog_metastore_creation.aws_iam_policy.metastore[0]
 }
 
 moved {
-  from = module.unity_catalog_metastore_creation.aws_iam_role_policy_attachment.metastore[0]
-  to   = module.metastore_storage[0].aws_iam_role_policy_attachment.metastore
+  from = module.metastore_storage[0].aws_iam_role_policy_attachment.metastore
+  to   = module.unity_catalog_metastore_creation.aws_iam_role_policy_attachment.metastore[0]
 }
 
 moved {
-  from = module.unity_catalog_metastore_creation.aws_s3_bucket_policy.metastore[0]
-  to   = module.metastore_storage[0].aws_s3_bucket_policy.metastore
+  from = module.metastore_storage[0].aws_s3_bucket_policy.metastore
+  to   = module.unity_catalog_metastore_creation.aws_s3_bucket_policy.metastore[0]
 }
 
 # User Workspace Assignment (Admin)

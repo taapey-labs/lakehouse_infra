@@ -118,17 +118,15 @@ sql_warehouse_cluster_size   = "2X-Small"   # or X-Small, Small, Medium, ...
 sql_warehouse_auto_stop_mins = 10
 ```
 
-## Metastore S3 bucket
+## Metastore S3 bucket and IAM role
 
-HYBRID mode creates a dedicated S3 bucket for Unity Catalog metastore storage only (`{resource_prefix}-metastore` by default). It is not the workspace root bucket or a catalog bucket.
+HYBRID mode creates a dedicated S3 bucket (`{resource_prefix}-metastore`) and IAM role (`{resource_prefix}-metastore`) in the **AWS account**, next to the Unity Catalog **account** metastore. They are not the workspace root bucket or a catalog bucket.
 
 ```hcl
 metastore_bucket_name = "my-prefix-metastore" # optional override
 ```
 
-If `metastore_exists = false`, a new metastore is created without `storage_root` (this Databricks account cannot create storage credentials on the account API). The dedicated bucket still gets a **workspace** storage credential, IAM role, and OPEN external location after the metastore is assigned to the workspace.
-
-If the metastore already exists, its storage root cannot be changed; the bucket, workspace credential, and external location are still created.
+If `metastore_exists = false`, the account metastore is created with `storage_root = s3://{bucket}/metastore` and a default `databricks_metastore_data_access` on that IAM role. If the metastore already exists, its storage root cannot be changed; the bucket, IAM role, and an account storage credential are still created. After the workspace is assigned, Terraform adds an OPEN external location on `s3://{bucket}/base`.
 
 ## Raw ingest S3 bucket and IAM role
 
