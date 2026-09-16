@@ -32,3 +32,35 @@ variable "metastore_bucket_name" {
   default     = null
   nullable    = true
 }
+
+variable "aws_account_id" {
+  description = "AWS account ID where the metastore IAM role is created."
+  type        = string
+}
+
+variable "databricks_account_id" {
+  description = "Databricks account ID used in the metastore bucket policy."
+  type        = string
+}
+
+variable "databricks_aws_account_id" {
+  description = "Databricks AWS account ID (414351767826 on commercial) for the metastore bucket policy."
+  type        = string
+}
+
+variable "aws_iam_partition" {
+  description = "AWS partition for IAM ARNs."
+  type        = string
+  default     = "aws"
+}
+
+variable "aws_assume_partition" {
+  description = "AWS partition for Unity Catalog assume-role policies."
+  type        = string
+  default     = "aws"
+}
+
+variable "unity_catalog_iam_arn" {
+  description = "Unity Catalog IAM ARN for the master role."
+  type        = string
+}

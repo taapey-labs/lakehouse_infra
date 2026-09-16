@@ -29,7 +29,7 @@ output "metastore_bucket_id" {
 
 output "metastore_role_arn" {
   description = "IAM role ARN for the metastore storage credential. Empty when serverless."
-  value       = local.is_serverless ? null : module.metastore_storage[0].role_arn
+  value       = module.unity_catalog_metastore_creation.metastore_role_arn
 }
 
 output "raw_ingest_bucket_id" {
