@@ -70,8 +70,16 @@ resource "aws_security_group" "sg" {
       from_port   = egress.value
       to_port     = egress.value
       protocol    = "tcp"
-      cidr_blocks = [var.vpc_cidr_range]
+      cidr_blocks = ["0.0.0.0/0"]
     }
+  }
+
+  egress {
+    description = "Databricks - Workspace SG - DNS UDP"
+    from_port   = 53
+    to_port     = 53
+    protocol    = "udp"
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   dynamic "egress" {

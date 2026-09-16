@@ -417,11 +417,53 @@ Resources:
           ToPort: 6666
           CidrIp: 0.0.0.0/0
           Description: SCC relay via NAT or PrivateLink
+        # Databricks compute-config validation matches each required port
+        # (from==to) to 0.0.0.0/0. A 8443-8451 range does not always pass.
         - IpProtocol: tcp
           FromPort: 8443
+          ToPort: 8443
+          CidrIp: 0.0.0.0/0
+          Description: Compute plane to control plane API
+        - IpProtocol: tcp
+          FromPort: 8444
+          ToPort: 8444
+          CidrIp: 0.0.0.0/0
+          Description: Unity Catalog logging and lineage
+        - IpProtocol: tcp
+          FromPort: 8445
+          ToPort: 8445
+          CidrIp: 0.0.0.0/0
+          Description: Control plane API (8445)
+        - IpProtocol: tcp
+          FromPort: 8446
+          ToPort: 8446
+          CidrIp: 0.0.0.0/0
+          Description: Reserved control plane (8446)
+        - IpProtocol: tcp
+          FromPort: 8447
+          ToPort: 8447
+          CidrIp: 0.0.0.0/0
+          Description: Reserved control plane (8447)
+        - IpProtocol: tcp
+          FromPort: 8448
+          ToPort: 8448
+          CidrIp: 0.0.0.0/0
+          Description: Reserved control plane (8448)
+        - IpProtocol: tcp
+          FromPort: 8449
+          ToPort: 8449
+          CidrIp: 0.0.0.0/0
+          Description: Reserved control plane (8449)
+        - IpProtocol: tcp
+          FromPort: 8450
+          ToPort: 8450
+          CidrIp: 0.0.0.0/0
+          Description: Reserved control plane (8450)
+        - IpProtocol: tcp
+          FromPort: 8451
           ToPort: 8451
           CidrIp: 0.0.0.0/0
-          Description: Control plane API / UC logging / future
+          Description: Reserved control plane (8451)
         - IpProtocol: tcp
           FromPort: 53
           ToPort: 53
@@ -530,6 +572,55 @@ Resources:
           ToPort: 8451
           SourceSecurityGroupId: !Ref DatabricksWorkspaceSecurityGroup
           Description: Future extendability
+
+  # Workspace SG must also allow outbound to the PrivateLink endpoint SG
+  # (Databricks classic PrivateLink). 0.0.0.0/0 already covers these ENIs;
+  # dest-SG rules keep the pairing explicit.
+  SgEgressToPlHttps:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupId: !Ref DatabricksWorkspaceSecurityGroup
+      IpProtocol: tcp
+      FromPort: 443
+      ToPort: 443
+      DestinationSecurityGroupId: !Ref DatabricksEndpointSecurityGroup
+      Description: REST / AWS interface endpoints
+  SgEgressToPlScc:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupId: !Ref DatabricksWorkspaceSecurityGroup
+      IpProtocol: tcp
+      FromPort: 6666
+      ToPort: 6666
+      DestinationSecurityGroupId: !Ref DatabricksEndpointSecurityGroup
+      Description: SCC relay PrivateLink
+  SgEgressToPlFips:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupId: !Ref DatabricksWorkspaceSecurityGroup
+      IpProtocol: tcp
+      FromPort: 2443
+      ToPort: 2443
+      DestinationSecurityGroupId: !Ref DatabricksEndpointSecurityGroup
+      Description: SCC FIPS PrivateLink
+  SgEgressToPlPg:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupId: !Ref DatabricksWorkspaceSecurityGroup
+      IpProtocol: tcp
+      FromPort: 5432
+      ToPort: 5432
+      DestinationSecurityGroupId: !Ref DatabricksEndpointSecurityGroup
+      Description: Lakebase PrivateLink
+  SgEgressToPlCp:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupId: !Ref DatabricksWorkspaceSecurityGroup
+      IpProtocol: tcp
+      FromPort: 8443
+      ToPort: 8451
+      DestinationSecurityGroupId: !Ref DatabricksEndpointSecurityGroup
+      Description: Control plane PrivateLink
 
   S3GatewayEndpoint:
     Type: AWS::EC2::VPCEndpoint
