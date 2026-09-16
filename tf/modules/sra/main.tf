@@ -100,8 +100,6 @@ module "databricks_mws_workspace" {
   # Network Connectivity Configuration and Network Policy
   network_connectivity_configuration_id = module.network_connectivity_configuration.ncc_id
   network_policy_id                     = var.workspace_network_policy_id
-
-  depends_on = [module.unity_catalog_metastore_creation, module.network_connectivity_configuration, module.disable_legacy_features]
 }
 
 # Wait for the newly created workspace to become fully available. Workspace-level settings applied
@@ -121,8 +119,6 @@ module "unity_catalog_metastore_assignment" {
 
   metastore_id = module.unity_catalog_metastore_creation.metastore_id
   workspace_id = module.databricks_mws_workspace.workspace_id
-
-  depends_on = [module.unity_catalog_metastore_creation, module.databricks_mws_workspace]
 }
 
 # Metastore external location + grants (bucket, IAM role, and credential are account-level).
