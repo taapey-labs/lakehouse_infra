@@ -154,9 +154,11 @@ resource "databricks_mws_workspaces" "workspace" {
   depends_on = [databricks_mws_networks.this]
 }
 
-# Attach Databricks default-policy. Custom {prefix}-np is not created.
+# Unity Catalog checkPathAccess calls this workspace. Custom {prefix}-np
+# without cross_workspace_access (this account cannot set it) returns
+# HTTP 403 KCUC4. Always attach Databricks default-policy.
 resource "databricks_workspace_network_option" "workspace_assignment" {
-  network_policy_id = var.network_policy_id
+  network_policy_id = "default-policy"
   workspace_id      = databricks_mws_workspaces.workspace.workspace_id
 }
 

@@ -3,8 +3,8 @@ output "workspace_host" {
 }
 
 output "workspace_network_policy_id" {
-  description = "Network policy currently attached to the workspace."
-  value       = var.workspace_network_policy_id
+  description = "Always default-policy. Custom {prefix}-np is not attached."
+  value       = "default-policy"
 }
 
 output "catalog_name" {

@@ -106,7 +106,11 @@ terraform -chdir=tf apply \
 
 Auth: AWS credential chain plus `DATABRICKS_CLIENT_ID` / `DATABRICKS_CLIENT_SECRET` (and matching Terraform variables).
 
-This Databricks account **rejects** `ingress.cross_workspace_access` on custom network policies. Terraform **does not create** `{prefix}-np` (`sss-aws-lakehouse-np`). Apply **destroys** that policy if it still exists. The workspace is bound to Databricks **`default-policy`**. If apply cannot delete the policy because the workspace is still attached, apply again after the workspace network option shows `default-policy`.
+This Databricks account **rejects** `ingress.cross_workspace_access` on custom network policies. Unity Catalog `checkPathAccess` (including `dbutils.fs.ls` on S3) then returns **KCUC4** `Unauthorized network access to workspace: 7474647671578063`. That is **not** S3, IAM, instance profiles, the S3 gateway route table, or the compute-config SG warning.
+
+Terraform always sets the workspace network option to **`default-policy`** and does **not** create `{prefix}-np`. Apply **destroys** `sss-aws-lakehouse-np` after that assignment. `workspace_network_policy_id` in tfvars is ignored.
+
+Confirm in the account console: **Workspaces → sss-aws-lakehouse** (id `7474647671578063`) → Network policy. It must say **`default-policy`**. Editing **Security → default-policy** (“Any workspaces with no policy attached”) does **not** attach it while `sss-aws-lakehouse-np` is still assigned. Then retry `dbutils.fs.ls`.
 
 `audit_log_delivery_exists` defaults to `true` so SRA does not recreate `{prefix}-audit-log-delivery-credential` when that MWS credential already exists. Set it to `false` only for a brand-new account that has never had audit log delivery configured.
 

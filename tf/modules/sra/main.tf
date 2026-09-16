@@ -37,6 +37,8 @@ module "network_connectivity_configuration" {
 }
 
 # Custom {prefix}-np is not created (count = 0 destroys sss-aws-lakehouse-np).
+# Destroy only after the workspace network option is default-policy; otherwise
+# Databricks refuses to delete a policy that is still attached.
 module "network_policy" {
   source = "./databricks_account/network_policy"
   providers = {
@@ -45,6 +47,8 @@ module "network_policy" {
 
   databricks_account_id = var.databricks_account_id
   resource_prefix       = var.resource_prefix
+
+  depends_on = [module.databricks_mws_workspace]
 }
 
 # Disable legacy features like Hive Metastore, DBFS, and no-isolation shared clusters for newly created workspaces at the account level.
@@ -99,7 +103,9 @@ module "databricks_mws_workspace" {
 
   # Network Connectivity Configuration and Network Policy
   network_connectivity_configuration_id = module.network_connectivity_configuration.ncc_id
-  network_policy_id                     = var.workspace_network_policy_id
+  # Always default-policy. A tfvars override to {prefix}-np keeps KCUC4
+  # (Unauthorized network access to workspace) on Unity Catalog path checks.
+  network_policy_id                     = "default-policy"
 }
 
 # Wait for the newly created workspace to become fully available. Workspace-level settings applied
