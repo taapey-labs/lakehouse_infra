@@ -137,10 +137,11 @@ variable "workspace_id" {
   default     = 7474647671578063
 }
 
-# {prefix}-np is not created. Workspace uses Databricks default-policy.
+# Ignored by the workspace resource. Always default-policy so Unity Catalog
+# path checks are not blocked with KCUC4. Kept so existing tfvars still parse.
 variable "workspace_network_policy_id" {
   type        = string
-  description = "Account network policy attached to the workspace (default-policy)"
+  description = "Unused. Workspace network option is always default-policy (custom {prefix}-np causes KCUC4)."
   default     = "default-policy"
 }
 

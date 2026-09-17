@@ -103,7 +103,7 @@ variable "cross_workspace_ingress_allowed_workspace_ids" {
 }
 
 variable "workspace_network_policy_id" {
-  description = "Network policy attached to the workspace. Custom {prefix}-np is not created; bind default-policy."
+  description = "Unused. Workspace network option is always default-policy."
   type        = string
   default     = "default-policy"
 }
