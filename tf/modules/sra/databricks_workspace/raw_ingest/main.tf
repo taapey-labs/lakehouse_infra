@@ -217,7 +217,7 @@ resource "databricks_external_location" "raw_ingest" {
 resource "databricks_grant" "raw_ingest_admin" {
   external_location = databricks_external_location.raw_ingest.name
   principal         = var.admin_user
-  privileges        = ["ALL_PRIVILEGES"]
+  privileges        = ["ALL_PRIVILEGES", "MANAGE"]
 }
 
 resource "databricks_grant" "raw_ingest_credential_admin" {

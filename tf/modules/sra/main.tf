@@ -213,7 +213,7 @@ module "unity_catalog_catalog_creation" {
   aws_assume_partition         = local.assume_role_partition
   unity_catalog_iam_arn        = local.unity_catalog_iam_arn
   resource_prefix              = var.resource_prefix
-  uc_catalog_name              = "${var.resource_prefix}-catalog-${module.databricks_mws_workspace.workspace_id}"
+  uc_catalog_name              = "${var.resource_prefix}-catalog"
   cmk_admin_arn                = local.cmk_admin_value
   workspace_id                 = module.databricks_mws_workspace.workspace_id
   user_workspace_catalog_admin = var.admin_user
