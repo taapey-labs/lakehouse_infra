@@ -161,11 +161,12 @@ resource "aws_s3_bucket_public_access_block" "unity_catalog" {
   depends_on              = [aws_s3_bucket.unity_catalog_bucket]
 }
 
-# External Location
+# External Location (bucket prefix /base so sibling prefixes like /datasource
+# can be separate external locations without overlapping this one).
 resource "databricks_external_location" "workspace_catalog_external_location" {
   count           = var.is_serverless ? 0 : 1
   name            = "${var.uc_catalog_name}-external-location"
-  url             = "s3://${var.uc_catalog_name}/"
+  url             = "s3://${var.uc_catalog_name}/base"
   credential_name = databricks_storage_credential.workspace_catalog_storage_credential[0].id
   comment         = "External location for catalog ${var.uc_catalog_name}"
   isolation_mode  = "ISOLATION_MODE_ISOLATED"
@@ -179,7 +180,7 @@ resource "databricks_catalog" "workspace_catalog" {
   name           = local.uc_catalog_name_us
   comment        = "This catalog is for workspace - ${var.workspace_id}"
   isolation_mode = "ISOLATED"
-  storage_root   = var.is_serverless ? null : "s3://${var.uc_catalog_name}/"
+  storage_root   = var.is_serverless ? null : "s3://${var.uc_catalog_name}/base"
   properties = {
     purpose = "Catalog for workspace - ${var.workspace_id}"
   }
