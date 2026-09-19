@@ -648,6 +648,46 @@ Resources:
       SourceSecurityGroupId: !Ref DatabricksWorkspaceSecurityGroup
       Description: Internode UDP
 
+  # S3 gateway replies hit the instance ENI as srcport 443 / dest ephemeral.
+  # Conntrack often does not match that path, so the stateful SG drops them
+  # (Flow Log REJECT) even with an allow-all NACL.
+  SgIngressS3GatewayReturn:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref DatabricksWorkspaceSecurityGroup
+      IpProtocol: tcp
+      FromPort: 1024
+      ToPort: 65535
+      SourcePrefixListId: !If
+        - UseS3PrefixListOverride
+        - !Ref S3PrefixListId
+        - !FindInMap
+          - S3PrefixList
+          - !Ref AWS::Region
+          - Id
+      Description: S3 gateway HTTPS return (ephemeral dest)
+
+  # Path MTU Discovery (ICMP type 3 code 4). Blocking this stalls large S3 TLS.
+  SgIngressIcmpPmtu:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref DatabricksWorkspaceSecurityGroup
+      IpProtocol: icmp
+      FromPort: 3
+      ToPort: 4
+      CidrIp: 0.0.0.0/0
+      Description: ICMP fragmentation needed (PMTU)
+
+  SgEgressIcmpPmtu:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupId: !Ref DatabricksWorkspaceSecurityGroup
+      IpProtocol: icmp
+      FromPort: 3
+      ToPort: 4
+      CidrIp: 0.0.0.0/0
+      Description: ICMP fragmentation needed (PMTU)
+
   SgEgressSelfTcp:
     Type: AWS::EC2::SecurityGroupEgress
     Properties:
