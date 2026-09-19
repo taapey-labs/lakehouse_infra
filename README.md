@@ -27,7 +27,7 @@ The template is a two-AZ playground VPC (`us-west-1`): Databricks classic comput
 | Intra / PrivateLink subnets | `PrivateLinkSubnetA/B` (`/26`) — **not** workspace subnets |
 | S3 gateway + STS + Kinesis + EC2 | STS, Kinesis, and EC2 on PrivateLink subnets |
 | Databricks REST + SCC VPCEs | Same, on PrivateLink subnets (existing SRA custom IDs) |
-| Workspace SG | Egress TCP/UDP self; TCP `0.0.0.0/0` on 443, 3306, 53, 6666, 2443, 5432, and **each** of 8443–8451 (Databricks compute-config check); UDP 53; HTTP 80; S3 prefix list; dest-SG to PrivateLink SG |
+| Workspace SG | Egress TCP/UDP self; TCP `0.0.0.0/0` on 443, 3306, 53, 6666, 2443, 5432, and **each** of 8443–8451; UDP 53; HTTP 80; S3 prefix list; dest-SG to PrivateLink SG; **ingress TCP 1024–65535 from S3 prefix list** (gateway return); ICMP 3/4 PMTU |
 | PrivateLink SG 443/2443/5432/6666/8443–8451 | Ingress from workspace SG |
 | VPC Flow Logs | VPC-wide, CloudWatch `/vpc/{ProjectName}/flow-logs`, **REJECT** by default (SG/NACL denials). Parameter `FlowLogTrafficType` can be `ACCEPT` or `ALL`. |
 | Network ACL | Allow-all inbound and outbound `0.0.0.0/0` on every subnet (Databricks customer-managed VPC). NACLs are stateless; without inbound ephemeral ALLOW, S3/NAT replies (`srcport=443`, `dstport=1024-65535`) show as Flow Log REJECT. |
