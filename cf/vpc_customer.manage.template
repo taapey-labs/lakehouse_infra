@@ -137,10 +137,21 @@ Parameters:
     Default: ''
     AllowedPattern: '^$|^[a-z0-9.-]+\.cloud\.databricks\.com$'
     Description: >-
-      Unused. Do not pin the public workspace hostname to the REST VPCE.
-      Classic compute uses that name on TCP 8443-8451 (control plane / UC
-      logging), which the REST NLB does not listen on (connection refused).
-      Leave empty so the name resolves on the public internet via NAT.
+      FRONT-END PRIVATELINK (opt-in). Leave EMPTY (default) to keep the current
+      behavior: the public workspace hostname resolves on the public internet via
+      NAT, and classic compute reaches the control plane on TCP 8443-8451.
+
+      Set to the workspace URL (e.g. dbc-<deployment-id>.cloud.databricks.com) to
+      create a private hosted zone that A-aliases that name to the Databricks
+      workspace (general access / REST) VPC endpoint. This routes classic
+      compute's workspace + Unity Catalog REST (443) over front-end PrivateLink,
+      which fixes UC "Unauthorized network access to workspace" (SQLSTATE KCUC4)
+      on classic compute. WARNING: this is a control-plane cutover to full
+      PrivateLink. Classic compute then uses 443 to this endpoint instead of
+      8443-8451 via NAT, so only enable it after confirming the workspace general
+      access endpoint carries all required control-plane traffic, and restart
+      classic clusters afterward. Roll back by clearing this value (or deleting
+      the WorkspacePublic* resources), which restores public/NAT resolution.
 
   WorkspacePrivatelinkDnsName:
     Type: String
@@ -174,6 +185,10 @@ Conditions:
   HasWorkspacePrivatelinkDnsName: !Not
     - !Equals
       - !Ref WorkspacePrivatelinkDnsName
+      - ''
+  HasWorkspacePublicDnsName: !Not
+    - !Equals
+      - !Ref WorkspacePublicDnsName
       - ''
 
 Resources:
@@ -969,6 +984,43 @@ Resources:
         DNSName: !Select [1, !Split [':', !Select [0, !GetAtt DatabricksWorkspaceVpcEndpoint.DnsEntries]]]
         EvaluateTargetHealth: false
 
+  # Front-end PrivateLink (opt-in via WorkspacePublicDnsName). Pins the public
+  # workspace URL to the general access / REST VPC endpoint so classic compute's
+  # workspace + Unity Catalog REST (443) rides PrivateLink and UC checkPathAccess
+  # is authorized (fixes KCUC4 "Unauthorized network access to workspace").
+  # Empty WorkspacePublicDnsName => these resources are not created and the name
+  # keeps resolving publicly via NAT.
+  WorkspacePublicPrivateHostedZone:
+    Type: AWS::Route53::HostedZone
+    Condition: HasWorkspacePublicDnsName
+    Properties:
+      Name: !Ref WorkspacePublicDnsName
+      VPCs:
+        - VPCId: !Ref Vpc
+          VPCRegion: !Ref AWS::Region
+      HostedZoneConfig:
+        Comment: Databricks workspace public URL -> general access / REST VPCE (front-end PrivateLink)
+      HostedZoneTags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-workspace-public-phz
+        - Key: Project
+          Value: !Ref ProjectName
+
+  WorkspacePublicAliasRecord:
+    Type: AWS::Route53::RecordSet
+    Condition: HasWorkspacePublicDnsName
+    DependsOn:
+      - DatabricksWorkspaceVpcEndpoint
+      - WorkspacePublicPrivateHostedZone
+    Properties:
+      HostedZoneId: !Ref WorkspacePublicPrivateHostedZone
+      Name: !Ref WorkspacePublicDnsName
+      Type: A
+      AliasTarget:
+        HostedZoneId: !Select [0, !Split [':', !Select [0, !GetAtt DatabricksWorkspaceVpcEndpoint.DnsEntries]]]
+        DNSName: !Select [1, !Split [':', !Select [0, !GetAtt DatabricksWorkspaceVpcEndpoint.DnsEntries]]]
+        EvaluateTargetHealth: false
+
 Outputs:
   VpcId:
     Description: custom_vpc_id for SRA
@@ -1008,6 +1060,10 @@ Outputs:
     Description: Route 53 private hosted zone for the workspace privatelink hostname (REST VPCE)
     Condition: HasWorkspacePrivatelinkDnsName
     Value: !Ref WorkspacePrivatelinkPrivateHostedZone
+  WorkspacePublicPrivateHostedZoneId:
+    Description: Route 53 private hosted zone pinning the public workspace URL to the general access / REST VPCE (front-end PrivateLink)
+    Condition: HasWorkspacePublicDnsName
+    Value: !Ref WorkspacePublicPrivateHostedZone
   StsVpcEndpointId:
     Value: !Ref StsVpcEndpoint
   KinesisVpcEndpointId:
