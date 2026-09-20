@@ -125,39 +125,35 @@ Terraform always sets the workspace network option to **`default-policy`** and d
 
 Confirm in the account console: **Workspaces → sss-aws-lakehouse** (id `7474647671578063`) → Network policy. It must say **`default-policy`**. Editing **Security → default-policy** (“Any workspaces with no policy attached”) does **not** attach it while `sss-aws-lakehouse-np` is still assigned. Then retry `dbutils.fs.ls`.
 
-### KCUC4 that persists on **classic** compute after `default-policy` (front-end PrivateLink)
+### KCUC4 on **classic** compute — private-DNS override of the workspace URL (incident postmortem)
 
-If `SHOW CATALOGS` / `LIST` / `dbutils.fs.ls` still returns **KCUC4** `Unauthorized network access to workspace` **only on classic compute** (classic clusters and **Pro/classic** SQL warehouses) while **serverless** and the Catalog Explorer UI work — and the workspace network option is already `default-policy` — the network policy is not the remaining cause. The symptom is:
+Symptom: `SHOW CATALOGS` / `LIST` / `dbutils.fs.ls` / `saveAsTable` return **KCUC4** `Unauthorized network access to workspace: 7474647671578063` **only on classic compute** (classic clusters and **Pro/classic** SQL warehouses), while the Catalog Explorer UI (direct UC REST) still works. `SELECT 1` on the same classic warehouse **succeeds**, so the compute is healthy — only its Unity Catalog calls fail. Note: this account was **not** eligible for serverless, so "serverless as a workaround" was not available.
 
-- `SELECT 1` on the classic warehouse **succeeds** (compute is healthy), but **every** Unity Catalog call returns KCUC4.
-- Serverless UC (e.g. storage-credential validation) and UI-driven catalog/schema/volume creation **succeed**.
+Root cause (confirmed by resolving the workspace URL from inside the cluster): a **Route 53 private hosted zone for the public workspace URL** (`dbc-<deployment-id>.cloud.databricks.com`) overrode DNS so the workspace URL resolved to a **private** VPC-endpoint IP (e.g. `10.10.6.59` / `10.10.4.249`) instead of public Databricks IPs via NAT. That endpoint serves **443 only** (8443–8451 refused) and is **not authorized** for the workspace front end, so classic-compute UC REST calls to it returned HTTP 403 `Unauthorized network access to workspace`. This is exactly the state the "Do not private-host `dbc-*.cloud.databricks.com`" warning above exists to prevent. The override was created by setting `WorkspacePublicDnsName` and deploying (a since-removed opt-in), which built a `WorkspacePublicPrivateHostedZone`.
 
-Root cause: with **back-end-only** PrivateLink, classic compute's Unity Catalog REST call to the workspace is not authorized (Databricks returns `Unauthorized network access to workspace`). Fixing it requires **front-end PrivateLink** for the workspace, so the classic compute reaches the workspace + UC REST over an authorized VPC endpoint on **443**. Serverless is unaffected either way. The account-side prerequisites are already present: the general access (REST) endpoint is registered (`custom_general_access_vpce_id`) and the workspace private access settings use `public_access_enabled = true`, `private_access_level = ACCOUNT`.
-
-Enable front-end PrivateLink by setting the CloudFormation parameter **`WorkspacePublicDnsName`** to the workspace URL (e.g. `dbc-<deployment-id>.cloud.databricks.com`). The stack then creates a private hosted zone that A-aliases that name to the **general access / REST** VPC endpoint (`WorkspacePublicPrivateHostedZone` / `WorkspacePublicAliasRecord`).
-
-> **This reverses the default guidance above** (“Do not private-host `dbc-*.cloud.databricks.com`”). That guidance holds while the control plane rides the **public** path on TCP **8443–8451** via NAT. Pinning the public name to the REST VPCE is a **control-plane cutover to full PrivateLink**: classic compute must then use **443** to the general access endpoint for all control-plane + UC REST instead of 8443–8451. Only enable it after confirming the general access endpoint service carries that traffic, and treat it as a change that can break cluster bootstrap if any PrivateLink piece is incomplete.
-
-Test and roll back:
+Detect it:
 
 ```bash
-# 1) Deploy with front-end PrivateLink enabled
-aws cloudformation deploy \
-  --stack-name vpc-customer-manage \
-  --template-file cf/vpc_customer.manage.template \
-  --capabilities CAPABILITY_NAMED_IAM \
-  --parameter-overrides \
-    ProjectName=lakehouse \
-    WorkspacePublicDnsName=dbc-<deployment-id>.cloud.databricks.com
-# 2) Restart the classic cluster / Pro SQL warehouse (picks up the new path)
-# 3) From classic compute, confirm UC works:
-#      SHOW CATALOGS;   LIST 's3://sss-aws-lakehouse-catalog/base';
-# 4) Confirm bootstrap still healthy (no BOOTSTRAP_TIMEOUT) after restart.
-# Rollback: redeploy with WorkspacePublicDnsName='' (empty) to restore public/NAT
-# resolution, then restart classic compute.
+# From a workspace subnet host (or a classic cluster): the workspace URL must resolve
+# to PUBLIC Databricks IPs, not 10.10.x
+nslookup dbc-<deployment-id>.cloud.databricks.com
+# There must be NO private hosted zone for the PUBLIC workspace name (only the two
+# .privatelink zones are expected):
+aws route53 list-hosted-zones --query "HostedZones[?Config.PrivateZone].name" --output table
 ```
 
-Alternative (no infra change): run Unity Catalog workloads on **serverless** SQL warehouses / serverless compute, which reach UC without front-end PrivateLink.
+Fix: remove the override so the workspace URL resolves publicly via NAT again (authorized by the workspace `default-policy` / `public_access_enabled = true`). If a CloudFormation stack created it (parameter `WorkspacePublicDnsName` set), clear that parameter and update the stack so CloudFormation deletes the `WorkspacePublicPrivateHostedZone`:
+
+```bash
+aws cloudformation update-stack \
+  --stack-name <your-customer-vpc-stack> \
+  --use-previous-template --capabilities CAPABILITY_NAMED_IAM \
+  --parameters ParameterKey=WorkspacePublicDnsName,ParameterValue= \
+               ParameterKey=ProjectName,UsePreviousValue=true
+               # ...UsePreviousValue=true for every other stack parameter
+```
+
+If the zone was created outside CloudFormation, delete that hosted zone directly. Then restart the classic cluster / Pro warehouse and retry. `WorkspacePublicDnsName` is intentionally left **unwired** in this template so it can no longer create such an override.
 
 `audit_log_delivery_exists` defaults to `true` so SRA does not recreate `{prefix}-audit-log-delivery-credential` when that MWS credential already exists. Set it to `false` only for a brand-new account that has never had audit log delivery configured.
 
