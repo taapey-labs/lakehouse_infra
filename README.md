@@ -207,3 +207,6 @@ nc -zv tunnel.privatelink.cloud.databricks.com 2443
 nc -zv tunnel.privatelink.cloud.databricks.com 6666
 nc -zv dbc-541c1fdc-07c5.cloud.databricks.com 8443
 ```
+
+### Reference
+Databricks documentation for creating a cross-account IAM role: [https://docs.databricks.com/aws/en/admin/workspace/create-uc-workspace?language=Databricks-managed%C2%A0VPC#step-1-create-a-cross-account-iam-role](https://docs.databricks.com/aws/en/admin/workspace/create-uc-workspace?language=Databricks-managed%C2%A0VPC#step-1-create-a-cross-account-iam-role)
