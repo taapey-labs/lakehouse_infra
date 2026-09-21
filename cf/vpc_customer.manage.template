@@ -671,6 +671,20 @@ Resources:
           - Id
       Description: S3 gateway HTTPS return (ephemeral dest)
 
+  # SCC relay FIPS (2443) must be bidirectional on the workspace SG. Egress on
+  # 2443 already exists (to 0.0.0.0/0 and to the PrivateLink endpoint SG); this
+  # adds the matching ingress so 2443 is allowed in both directions, per
+  # Databricks guidance for FIPS-encrypted secure cluster connectivity.
+  SgIngressSccFips2443:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref DatabricksWorkspaceSecurityGroup
+      IpProtocol: tcp
+      FromPort: 2443
+      ToPort: 2443
+      CidrIp: 0.0.0.0/0
+      Description: SCC FIPS (2443) inbound - bidirectional secure cluster connectivity
+
   # Path MTU Discovery (ICMP type 3 code 4). Blocking this stalls large S3 TLS.
   SgIngressIcmpPmtu:
     Type: AWS::EC2::SecurityGroupIngress
