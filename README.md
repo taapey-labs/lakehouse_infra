@@ -29,8 +29,7 @@ The template is a two-AZ playground VPC (`us-west-1`): Databricks classic comput
 | Databricks REST + SCC VPCEs | Same, on PrivateLink subnets (existing SRA custom IDs) |
 | Workspace SG | Egress TCP/UDP self; TCP `0.0.0.0/0` on 443, 3306, 53, 6666, 2443, 5432, and **each** of 8443–8451; UDP 53; HTTP 80; S3 prefix list; dest-SG to PrivateLink SG; **ingress TCP 1024–65535 from S3 prefix list** (gateway return); ICMP 3/4 PMTU |
 | PrivateLink SG 443/2443/5432/6666/8443–8451 | Ingress from workspace SG |
-| VPC Flow Logs | VPC-wide, CloudWatch `/vpc/{ProjectName}/flow-logs`, **REJECT** by default (SG/NACL denials). Parameter `FlowLogTrafficType` can be `ACCEPT` or `ALL`. |
-| Network ACL | Allow-all inbound and outbound `0.0.0.0/0` on every subnet (Databricks customer-managed VPC). NACLs are stateless; without inbound ephemeral ALLOW, S3/NAT replies (`srcport=443`, `dstport=1024-65535`) show as Flow Log REJECT. |
+| Network ACL | Allow-all inbound and outbound `0.0.0.0/0` on every subnet (Databricks customer-managed VPC). NACLs are stateless; without inbound ephemeral ALLOW, S3/NAT replies (`srcport=443`, `dstport=1024-65535`) are dropped. |
 
 PrivateLink is kept so the current workspace registration does not break. NAT plus internet SG egress is the path for control-plane and AWS API traffic that is not pinned to a VPC endpoint.
 
@@ -71,14 +70,6 @@ aws cloudformation deploy \
     ProjectName=lakehouse \
     AvailabilityZoneA=us-west-1a \
     AvailabilityZoneB=us-west-1c
-```
-
-REJECT flow logs land in CloudWatch Logs `/vpc/lakehouse/flow-logs` (14-day retention). `action=REJECT` is a security-group or NACL drop, not Unity Catalog KCUC4. Example:
-
-```bash
-aws logs filter-log-events \
-  --log-group-name /vpc/lakehouse/flow-logs \
-  --filter-pattern '"REJECT"'
 ```
 
 Map stack outputs to SRA:

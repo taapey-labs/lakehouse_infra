@@ -43,7 +43,6 @@ Metadata:
           default: Optional overrides
         Parameters:
           - S3PrefixListId
-          - FlowLogTrafficType
 
 Mappings:
   S3PrefixList:
@@ -161,15 +160,6 @@ Parameters:
       Override for the AWS-managed S3 prefix list ID used in workspace SG egress.
       Leave empty to use the regional mapping (us-west-1 is pl-6ba54002).
 
-  FlowLogTrafficType:
-    Type: String
-    Default: REJECT
-    AllowedValues:
-      - REJECT
-      - ACCEPT
-      - ALL
-    Description: VPC Flow Logs capture type. REJECT is security-group and NACL denials.
-
 Conditions:
   UseS3PrefixListOverride: !Not
     - !Equals
@@ -190,65 +180,6 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub ${ProjectName}-compute-plane-vpc
-        - Key: Project
-          Value: !Ref ProjectName
-
-  VpcFlowLogGroup:
-    Type: AWS::Logs::LogGroup
-    Properties:
-      LogGroupName: !Sub /vpc/${ProjectName}/flow-logs
-      RetentionInDays: 14
-      Tags:
-        - Key: Name
-          Value: !Sub ${ProjectName}-vpc-flow-logs
-        - Key: Project
-          Value: !Ref ProjectName
-
-  VpcFlowLogRole:
-    Type: AWS::IAM::Role
-    Properties:
-      RoleName: !Sub ${ProjectName}-vpc-flow-logs
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: vpc-flow-logs.amazonaws.com
-            Action: sts:AssumeRole
-      Policies:
-        - PolicyName: vpc-flow-logs-to-cloudwatch
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - logs:CreateLogGroup
-                  - logs:CreateLogStream
-                  - logs:PutLogEvents
-                  - logs:DescribeLogGroups
-                  - logs:DescribeLogStreams
-                Resource:
-                  - !GetAtt VpcFlowLogGroup.Arn
-                  - !Sub '${VpcFlowLogGroup.Arn}:*'
-      Tags:
-        - Key: Name
-          Value: !Sub ${ProjectName}-vpc-flow-logs
-        - Key: Project
-          Value: !Ref ProjectName
-
-  VpcFlowLog:
-    Type: AWS::EC2::FlowLog
-    Properties:
-      ResourceType: VPC
-      ResourceId: !Ref Vpc
-      TrafficType: !Ref FlowLogTrafficType
-      MaxAggregationInterval: 60
-      LogDestinationType: cloud-watch-logs
-      LogGroupName: !Ref VpcFlowLogGroup
-      DeliverLogsPermissionArn: !GetAtt VpcFlowLogRole.Arn
-      Tags:
-        - Key: Name
-          Value: !Sub ${ProjectName}-vpc-flow-logs
         - Key: Project
           Value: !Ref ProjectName
 
@@ -332,8 +263,8 @@ Resources:
 
   # NACLs are stateless. Databricks requires inbound ALLOW ALL from 0.0.0.0/0
   # so S3/NAT replies to ephemeral ports (1024-65535) are not dropped. A custom
-  # or tightened default NACL that only allows inbound from the VPC CIDR produces
-  # Flow Log REJECT: S3:443 -> node:ephemeral.
+  # or tightened default NACL that only allows inbound from the VPC CIDR drops
+  # those replies (S3:443 -> node:ephemeral).
   DatabricksNetworkAcl:
     Type: AWS::EC2::NetworkAcl
     Properties:
@@ -654,7 +585,7 @@ Resources:
 
   # S3 gateway replies hit the instance ENI as srcport 443 / dest ephemeral.
   # Conntrack often does not match that path, so the stateful SG drops them
-  # (Flow Log REJECT) even with an allow-all NACL.
+  # even with an allow-all NACL.
   SgIngressS3GatewayReturn:
     Type: AWS::EC2::SecurityGroupIngress
     Properties:
@@ -1034,9 +965,3 @@ Outputs:
     Value: !Ref Ec2VpcEndpoint
   S3GatewayEndpointId:
     Value: !Ref S3GatewayEndpoint
-  VpcFlowLogId:
-    Description: VPC Flow Log (REJECT by default) for security-group and NACL denials
-    Value: !Ref VpcFlowLog
-  VpcFlowLogGroupName:
-    Description: CloudWatch log group for VPC Flow Logs
-    Value: !Ref VpcFlowLogGroup
