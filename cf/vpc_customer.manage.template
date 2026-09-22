@@ -39,6 +39,7 @@ Metadata:
         Parameters:
           - WorkspacePublicDnsName
           - WorkspacePrivatelinkDnsName
+          - ControlPlanePrivatelinkDnsName
       - Label:
           default: Optional overrides
         Parameters:
@@ -153,6 +154,21 @@ Parameters:
       Workspace PrivateLink hostname. Dedicated private hosted zone A-aliased to
       the REST VPCE so it cannot resolve to the SCC tunnel ENIs. Leave empty to skip.
 
+  ControlPlanePrivatelinkDnsName:
+    Type: String
+    Default: oregon.privatelink.cloud.databricks.com
+    AllowedPattern: '^$|^[a-z0-9.-]+\.privatelink\.cloud\.databricks\.com$'
+    Description: >-
+      Control-plane PrivateLink hostname for the workspace's control-plane region.
+      For an N. California workspace the control plane is in Oregon, so
+      the webapp/REST control plane is oregon.cloud.databricks.com and its
+      PrivateLink name is oregon.privatelink.cloud.databricks.com. Databricks
+      requires ALL workspace/control-plane URLs to resolve to the workspace
+      (General Access / REST) VPC endpoint; without this, classic compute reaches
+      the control plane publicly and Unity Catalog returns KCUC4. A dedicated
+      private hosted zone A-aliases this name to the REST VPCE. Set to match your
+      control-plane region (see the region/endpoint doc) or leave empty to skip.
+
   S3PrefixListId:
     Type: String
     Default: ''
@@ -168,6 +184,10 @@ Conditions:
   HasWorkspacePrivatelinkDnsName: !Not
     - !Equals
       - !Ref WorkspacePrivatelinkDnsName
+      - ''
+  HasControlPlanePrivatelinkDnsName: !Not
+    - !Equals
+      - !Ref ControlPlanePrivatelinkDnsName
       - ''
 
 Resources:
@@ -918,6 +938,42 @@ Resources:
         DNSName: !Select [1, !Split [':', !Select [0, !GetAtt DatabricksWorkspaceVpcEndpoint.DnsEntries]]]
         EvaluateTargetHealth: false
 
+  # Control-plane PrivateLink hostname (e.g. oregon.privatelink.cloud.databricks.com
+  # for an N. California workspace). Pins the control-plane region name to the REST /
+  # General Access VPC endpoint so classic compute + Unity Catalog reach the
+  # control plane over PrivateLink instead of the public control-plane IPs.
+  # Empty ControlPlanePrivatelinkDnsName => not created.
+  ControlPlanePrivatelinkPrivateHostedZone:
+    Type: AWS::Route53::HostedZone
+    Condition: HasControlPlanePrivatelinkDnsName
+    Properties:
+      Name: !Ref ControlPlanePrivatelinkDnsName
+      VPCs:
+        - VPCId: !Ref Vpc
+          VPCRegion: !Ref AWS::Region
+      HostedZoneConfig:
+        Comment: Databricks control-plane privatelink hostname -> REST VPCE
+      HostedZoneTags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-controlplane-privatelink-phz
+        - Key: Project
+          Value: !Ref ProjectName
+
+  ControlPlanePrivatelinkAliasRecord:
+    Type: AWS::Route53::RecordSet
+    Condition: HasControlPlanePrivatelinkDnsName
+    DependsOn:
+      - DatabricksWorkspaceVpcEndpoint
+      - ControlPlanePrivatelinkPrivateHostedZone
+    Properties:
+      HostedZoneId: !Ref ControlPlanePrivatelinkPrivateHostedZone
+      Name: !Ref ControlPlanePrivatelinkDnsName
+      Type: A
+      AliasTarget:
+        HostedZoneId: !Select [0, !Split [':', !Select [0, !GetAtt DatabricksWorkspaceVpcEndpoint.DnsEntries]]]
+        DNSName: !Select [1, !Split [':', !Select [0, !GetAtt DatabricksWorkspaceVpcEndpoint.DnsEntries]]]
+        EvaluateTargetHealth: false
+
 Outputs:
   VpcId:
     Description: custom_vpc_id for SRA
@@ -957,6 +1013,10 @@ Outputs:
     Description: Route 53 private hosted zone for the workspace privatelink hostname (REST VPCE)
     Condition: HasWorkspacePrivatelinkDnsName
     Value: !Ref WorkspacePrivatelinkPrivateHostedZone
+  ControlPlanePrivatelinkPrivateHostedZoneId:
+    Description: Route 53 private hosted zone pinning the control-plane privatelink hostname to the REST VPCE
+    Condition: HasControlPlanePrivatelinkDnsName
+    Value: !Ref ControlPlanePrivatelinkPrivateHostedZone
   StsVpcEndpointId:
     Value: !Ref StsVpcEndpoint
   KinesisVpcEndpointId:
