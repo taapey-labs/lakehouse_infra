@@ -301,6 +301,22 @@ module "cluster_configuration" {
   depends_on = [module.databricks_mws_workspace]
 }
 
+# Git Proxy for private Git servers (Repos / Git folders). Always-on single-node
+# cluster plus workspace-conf enableGitProxy / gitProxyClusterId. Skipped for
+# serverless-only workspaces (classic compute plane required).
+module "git_proxy" {
+  count  = local.is_serverless ? 0 : 1
+  source = "./databricks_workspace/git_proxy"
+  providers = {
+    databricks = databricks.created_workspace
+  }
+
+  enable_compliance_security_profile = var.enable_compliance_security_profile
+  resource_prefix                    = var.resource_prefix
+
+  depends_on = [time_sleep.wait_for_workspace]
+}
+
 # Starter SQL warehouse. Size is set from tfvars (default 2X-Small).
 module "starter_sql_warehouse" {
   source = "./databricks_workspace/sql_warehouse"

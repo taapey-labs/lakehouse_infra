@@ -22,6 +22,16 @@ output "starter_sql_warehouse_name" {
   value       = module.starter_sql_warehouse.name
 }
 
+output "git_proxy_cluster_id" {
+  description = "ID of the Repos Git Proxy cluster. Empty when serverless."
+  value       = local.is_serverless ? null : module.git_proxy[0].cluster_id
+}
+
+output "git_proxy_cluster_name" {
+  description = "Name of the Repos Git Proxy cluster. Empty when serverless."
+  value       = local.is_serverless ? null : module.git_proxy[0].cluster_name
+}
+
 output "metastore_bucket_id" {
   description = "S3 bucket used only for Unity Catalog metastore storage."
   value       = module.unity_catalog_metastore_creation.metastore_bucket_id

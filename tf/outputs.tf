@@ -28,6 +28,11 @@ output "starter_sql_warehouse_id" {
   value       = module.aws_databricks_sra.starter_sql_warehouse_id
 }
 
+output "git_proxy_cluster_id" {
+  description = "ID of the always-on Repos Git Proxy cluster used for private Git servers."
+  value       = module.aws_databricks_sra.git_proxy_cluster_id
+}
+
 output "raw_ingest_bucket" {
   description = "S3 bucket for raw data landed from outside Databricks."
   value       = module.aws_databricks_sra.raw_ingest_bucket_id
