@@ -150,6 +150,22 @@ If the zone was created outside CloudFormation, delete that hosted zone directly
 
 `audit_log_delivery_exists` defaults to `true` so SRA does not recreate `{prefix}-audit-log-delivery-credential` when that MWS credential already exists. Set it to `false` only for a brand-new account that has never had audit log delivery configured.
 
+## Git Proxy (private Git servers / Repos)
+
+HYBRID mode creates an always-on single-node cluster named **Repos Git Proxy** (Databricks Runtime **16.4.x-scala2.13**, `m5.large`, no autotermination) and sets workspace conf `enableGitProxy=true` plus `gitProxyClusterId` to that cluster. That is the same shape as the [official enablement notebook](https://github.com/databricks/databricks-repos-proxy/blob/main/enable_git_proxy_jupyter.ipynb). Do **not** change the Runtime on this cluster.
+
+Use this when the Git server is private, on-prem, or behind a firewall (GitHub Enterprise Server, Bitbucket Server, GitLab self-managed). Public GitHub.com / GitLab.com do not need it. Once enabled, **all** Git folders traffic in the workspace, including public repos, goes through this cluster.
+
+The Git host must be reachable from the classic compute VPC (HTTPS, typically TCP 443 via NAT or PrivateLink). Add the NAT Elastic IP to the Git server allowlist if it filters by source IP.
+
+Cluster ACL is **admins CAN_MANAGE** only (no workspace-wide CAN ATTACH TO). If a cluster named `Repos Git Proxy` already exists from the notebook, import it instead of creating a second one:
+
+```bash
+terraform -chdir=tf import \
+  'module.aws_databricks_sra.module.git_proxy[0].databricks_cluster.this' \
+  <cluster-id>
+```
+
 ## Starter SQL warehouse
 
 Terraform manages the workspace **Starter Warehouse** (Pro, size **`2X-Small`** by default). If a warehouse with that name already exists, it is imported into state instead of creating a second one.
